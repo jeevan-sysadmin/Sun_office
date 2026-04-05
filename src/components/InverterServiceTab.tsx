@@ -27,6 +27,12 @@ import {
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import type { InverterService } from "./types";
+import {
+  badgeToneForStatus,
+  formatReceiptLabel,
+  openPrintReceipt,
+  type ReceiptSection,
+} from "./utils/receiptPrint";
 
 // Create motion components properly to avoid deprecation warning
 const MotionDiv = motion.div;
@@ -400,187 +406,90 @@ const InverterServiceTab: React.FC<InverterServiceTabProps> = ({
   // Print single receipt
   const printReceipt = (service: InverterService) => {
     try {
-      const printWindow = window.open('', '_blank');
-      if (printWindow) {
-        // const equipment = service.inverter_model || 'N/A'; // Unused but kept for future use
-        // const equipmentSerial = service.inverter_serial || 'N/A'; // Unused but kept for future use
-        
-        printWindow.document.write(`
-          <html>
-            <head>
-              <title>Inverter Service Receipt - ${service.service_code}</title>
-              <meta name="viewport" content="width=device-width, initial-scale=1.0">
-              <style>
-                body { 
-                  font-family: 'Arial', sans-serif; 
-                  padding: 20px; 
-                  background: #fff;
-                  color: #333;
-                  line-height: 1.6;
-                  margin: 0;
-                }
-                .receipt { 
-                  max-width: 400px; 
-                  margin: 0 auto;
-                  padding: 20px;
-                  border: 1px solid #ddd;
-                  border-radius: 8px;
-                  background: #fff;
-                  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-                }
-                .header { 
-                  text-align: center; 
-                  margin-bottom: 20px;
-                  border-bottom: 2px solid #10b981;
-                  padding-bottom: 10px;
-                }
-                .header h2 {
-                  color: #10b981;
-                  margin: 0;
-                  font-size: 24px;
-                }
-                .header h3 {
-                  color: #334155;
-                  margin: 10px 0;
-                  font-size: 18px;
-                }
-                .section { 
-                  margin: 15px 0; 
-                  padding: 10px 0;
-                  border-bottom: 1px dashed #ddd;
-                }
-                .section:last-child {
-                  border-bottom: none;
-                }
-                .section h4 {
-                  color: #475569;
-                  margin: 0 0 10px 0;
-                  font-size: 14px;
-                  text-transform: uppercase;
-                  font-weight: 600;
-                }
-                .section p {
-                  margin: 5px 0;
-                  font-size: 14px;
-                }
-                .badge { 
-                  display: inline-block; 
-                  padding: 4px 8px; 
-                  border-radius: 4px; 
-                  font-size: 11px; 
-                  margin: 2px;
-                  font-weight: 500;
-                }
-                .footer {
-                  text-align: center;
-                  margin-top: 30px;
-                  color: #666;
-                  font-size: 12px;
-                  border-top: 1px dashed #ddd;
-                  padding-top: 15px;
-                }
-                @media print {
-                  body { 
-                    padding: 0; 
-                    margin: 0;
-                  }
-                  .receipt { 
-                    border: none; 
-                    box-shadow: none;
-                  }
-                  @page {
-                    margin: 20mm;
-                  }
-                }
-                @media (max-width: 480px) {
-                  body { padding: 10px; }
-                  .receipt { padding: 15px; }
-                  .header h2 { font-size: 20px; }
-                }
-              </style>
-            </head>
-            <body>
-              <div class="receipt">
-                <div class="header">
-                  <h2>Sun Powers Inverter Service</h2>
-                  <h3>Service Order Receipt</h3>
-                  <p><strong>Service Code:</strong> ${service.service_code}</p>
-                  <p><strong>Date:</strong> ${formatDateOnly(service.created_at)}</p>
-                </div>
-                
-                <div class="section">
-                  <h4>Customer Information</h4>
-                  <p><strong>Name:</strong> ${service.customer_name || 'N/A'}</p>
-                  <p><strong>Phone:</strong> ${service.customer_phone}</p>
-                  ${service.customer_email ? `<p><strong>Email:</strong> ${service.customer_email}</p>` : ''}
-                  ${service.customer_address ? `<p><strong>Address:</strong> ${service.customer_address}</p>` : ''}
-                </div>
-                
-                <div class="section">
-                  <h4>Inverter Details</h4>
-                  <p><strong>Brand:</strong> ${service.inverter_brand || 'N/A'}</p>
-                  <p><strong>Model:</strong> ${service.inverter_model || 'N/A'}</p>
-                  ${service.inverter_serial ? `<p><strong>Serial:</strong> ${service.inverter_serial}</p>` : ''}
-                  <p><strong>Power Rating:</strong> ${service.inverter_power_rating || 'N/A'}</p>
-                  <p><strong>Type:</strong> ${service.inverter_type || 'N/A'}</p>
-                  ${service.inverter_wave_type ? `<p><strong>Wave Type:</strong> ${service.inverter_wave_type.replace('_', ' ')}</p>` : ''}
-                </div>
-                
-                <div class="section">
-                  <h4>Service Details</h4>
-                  <p><strong>Issue:</strong> ${service.issue_description || 'No description'}</p>
-                  <p><strong>Status:</strong> ${service.status.replace('_', ' ').toUpperCase()}</p>
-                  <p><strong>Warranty:</strong> ${service.warranty_status.replace('_', ' ').toUpperCase()}</p>
-                  <p><strong>AMC:</strong> ${service.amc_status.replace('_', ' ').toUpperCase()}</p>
-                </div>
-                
-                <div class="section">
-                  <h4>Financial Details</h4>
-                  <p><strong>Final Cost:</strong> ${formatCurrency(service.final_cost)}</p>
-                  <p><strong>Payment Status:</strong> ${service.payment_status?.toUpperCase() || 'PENDING'}</p>
-                </div>
-                
-                <div class="section">
-                  <h4>Dates</h4>
-                  <p><strong>Created:</strong> ${formatDateOnly(service.created_at)}</p>
-                  ${service.estimated_completion_date ? `<p><strong>Est. Completion:</strong> ${formatDateOnly(service.estimated_completion_date)}</p>` : ''}
-                  <p><strong>Last Updated:</strong> ${formatDateOnly(service.updated_at)}</p>
-                </div>
-                
-                ${service.notes ? `
-                <div class="section">
-                  <h4>Additional Notes</h4>
-                  <p style="white-space: pre-line;">${service.notes}</p>
-                </div>
-                ` : ''}
-                
-                ${service.staff_name ? `
-                <div class="section">
-                  <h4>Assigned Technician</h4>
-                  <p><strong>Name:</strong> ${service.staff_name}</p>
-                  ${service.staff_email ? `<p><strong>Email:</strong> ${service.staff_email}</p>` : ''}
-                </div>
-                ` : ''}
-                
-                <div class="footer">
-                  <p>Thank you for choosing Sun Powers Inverter Service</p>
-                  <p>For any queries, contact: +91 9876543210</p>
-                  <p>Email: support@sunpowers.com</p>
-                  <p style="margin-top: 10px; font-style: italic;">This is a computer generated receipt</p>
-                </div>
-              </div>
-              <script>
-                window.onload = function() {
-                  setTimeout(function() {
-                    window.print();
-                    window.close();
-                  }, 500);
-                }
-              </script>
-            </body>
-          </html>
-        `);
-        printWindow.document.close();
+      const customerAddress = [
+        service.customer_address,
+        service.customer_city,
+        service.customer_state,
+        service.customer_zip ? `PIN ${service.customer_zip}` : null,
+      ]
+        .filter(Boolean)
+        .join(', ');
+      const amountValue = formatCurrency(service.final_cost);
+      const sections: ReceiptSection[] = [
+        {
+          title: "Customer Details",
+          fields: [
+            { label: "Customer Name", value: service.customer_name || 'N/A' },
+            { label: "Phone Number", value: service.customer_phone },
+            { label: "Email Address", value: service.customer_email || null },
+            { label: "Address", value: customerAddress || null, wide: true, multiline: true },
+          ],
+        },
+        {
+          title: "Inverter Details",
+          fields: [
+            { label: "Brand", value: service.inverter_brand || 'N/A' },
+            { label: "Model", value: service.inverter_model || 'N/A' },
+            { label: "Serial Number", value: service.inverter_serial || null },
+            { label: "Power Rating", value: service.inverter_power_rating || 'N/A' },
+            { label: "Inverter Type", value: formatReceiptLabel(service.inverter_type) || null },
+          ],
+        },
+        {
+          title: "Service Summary",
+          fields: [
+            { label: "Service Type", value: formatReceiptLabel(service.service_type) || "Inverter Service" },
+            { label: "Created On", value: formatDateOnly(service.created_at) },
+            {
+              label: "Issue Description",
+              value: service.issue_description || 'No issue description provided.',
+              wide: true,
+              multiline: true,
+            },
+            { label: "Assigned Staff", value: service.staff_name || null },
+            { label: "Staff Email", value: service.staff_email || null },
+            { label: "Notes", value: service.notes || null, wide: true, multiline: true },
+          ],
+        },
+      ];
+
+      const opened = openPrintReceipt({
+        documentTitle: `Inverter Service Receipt - ${service.service_code}`,
+        serviceLine: "Inverter Service",
+        receiptLabel: "Service Receipt",
+        code: service.service_code,
+        codeLabel: "Service Code",
+        issuedOn: formatDateOnly(service.created_at),
+        badges: [
+          {
+            label: `Status: ${formatReceiptLabel(service.status) || "Pending"}`,
+            tone: badgeToneForStatus(service.status),
+          },
+          {
+            label: `Warranty: ${formatReceiptLabel(service.warranty_status) || "Unknown"}`,
+            tone: badgeToneForStatus(service.warranty_status),
+          },
+          {
+            label: `AMC: ${formatReceiptLabel(service.amc_status) || "Unknown"}`,
+            tone: badgeToneForStatus(service.amc_status),
+          },
+          {
+            label: `Payment: ${formatReceiptLabel(service.payment_status) || "Pending"}`,
+            tone: badgeToneForStatus(service.payment_status),
+          },
+        ],
+        amount: {
+          label: "Final Amount",
+          value: amountValue,
+        },
+        sections,
+        footerTitle: "Thank you for choosing Sun Office.",
+        footerNote: "Computer-generated receipt from the Sun Office inverter service desk.",
+        signatureLabels: ["Customer", service.staff_name || "Sun Office"],
+      });
+
+      if (!opened) {
+        alert('Unable to start printing. Please try again.');
       }
     } catch (error) {
       console.error('Print error:', error);

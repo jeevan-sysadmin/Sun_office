@@ -22,6 +22,12 @@ import {
   FiCpu,
 } from "react-icons/fi";
 import type { ServiceOrder } from "../types";
+import {
+  badgeToneForStatus,
+  formatReceiptLabel,
+  openPrintReceipt,
+  type ReceiptSection,
+} from "../utils/receiptPrint";
 
 interface ServiceDetailModalProps {
   service: ServiceOrder;
@@ -65,7 +71,7 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
   };
 
   // Format date
-  const formatDate = (dateString?: string) => {
+  const formatDate = (dateString?: string | null) => {
     if (!dateString) return 'Not set';
     try {
       const date = new Date(dateString);
@@ -80,7 +86,7 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
   };
 
   // Format date with time
-  const formatDateTime = (dateString?: string) => {
+  const formatDateTime = (dateString?: string | null) => {
     if (!dateString) return 'Not set';
     try {
       const date = new Date(dateString);
@@ -177,10 +183,114 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
     const { staffName, staffEmail, staffPhone, staffRole } = getStaffInfo();
     const inverter = getInverterInfo();
     const battery = getBatteryInfo();
+
+    const amountValue = formatCurrency(service.final_cost || service.estimated_cost);
+    const depositValue = formatCurrency(service.deposit_amount);
+    const sections: ReceiptSection[] = [
+      {
+        title: "Customer Details",
+        fields: [
+          { label: "Customer Name", value: service.customer_name },
+          { label: "Phone Number", value: service.customer_phone },
+          { label: "Email Address", value: service.customer_email || null },
+          {
+            label: "Address",
+            value: service.customer_address || null,
+            wide: true,
+            multiline: true,
+          },
+        ],
+      },
+      {
+        title: "Equipment Details",
+        fields: [
+          { label: "Battery Model", value: battery.model },
+          { label: "Battery Serial", value: battery.serial },
+          { label: "Inverter Model", value: inverter.model },
+          { label: "Inverter Serial", value: inverter.serial },
+          { label: "Power Rating", value: inverter.powerRating ? `${inverter.powerRating} VA` : null },
+          { label: "Replacement Serial", value: service.replacement_battery_serial || null },
+        ],
+      },
+      {
+        title: "Service Summary",
+        fields: [
+          { label: "Service Type", value: formatReceiptLabel(service.service_type) || "General Service" },
+          { label: "Priority", value: formatReceiptLabel(service.priority) || "Standard" },
+          { label: "Created On", value: formatDateTime(service.created_at) },
+          {
+            label: "Estimated Completion",
+            value: service.estimated_completion_date ? formatDate(service.estimated_completion_date) : null,
+          },
+          { label: "Assigned Staff", value: staffName || "Not Assigned Yet" },
+          { label: "Deposit Received", value: depositValue || null },
+          {
+            label: "Issue Description",
+            value: service.issue_description || "No issue description provided.",
+            wide: true,
+            multiline: true,
+          },
+          { label: "Internal Notes", value: service.notes || null, wide: true, multiline: true },
+        ],
+      },
+      {
+        title: "Billing and Support",
+        fields: [
+          { label: "Claim Type", value: formatReceiptLabel(service.battery_claim) },
+          { label: "Staff Role", value: staffRole || null },
+          { label: "Staff Email", value: staffEmail || null },
+          { label: "Staff Phone", value: staffPhone || null },
+        ],
+      },
+    ];
+
+    const opened = openPrintReceipt({
+      documentTitle: `Service Receipt - ${service.service_code}`,
+      serviceLine: "Battery and Inverter Service",
+      receiptLabel: "Service Receipt",
+      code: service.service_code,
+      codeLabel: "Service Code",
+      issuedOn: formatDateTime(service.created_at),
+      badges: [
+        {
+          label: `Status: ${formatReceiptLabel(service.status) || "Pending"}`,
+          tone: badgeToneForStatus(service.status),
+        },
+        {
+          label: `Warranty: ${formatReceiptLabel(service.warranty_status) || "Out Of Warranty"}`,
+          tone: badgeToneForStatus(service.warranty_status),
+        },
+        {
+          label: `AMC: ${formatReceiptLabel(service.amc_status) || "No AMC"}`,
+          tone: badgeToneForStatus(service.amc_status),
+        },
+        {
+          label: `Payment: ${formatReceiptLabel(service.payment_status) || "Pending"}`,
+          tone: badgeToneForStatus(service.payment_status),
+        },
+      ],
+      amount: amountValue
+        ? {
+            label: service.final_cost ? "Final Amount" : "Estimated Amount",
+            value: amountValue,
+            helper: depositValue ? `Deposit received: ${depositValue}` : null,
+          }
+        : null,
+      sections,
+      footerTitle: "Thank you for choosing Sun Office.",
+      footerNote: "Computer-generated service receipt for Sun Office support and service records.",
+      signatureLabels: ["Customer", staffName || "Authorized By"],
+    });
+
+    if (!opened) {
+      alert("Unable to start printing. Please try again.");
+    }
+
+    return;
     
     const printWindow = window.open('', '_blank');
     if (printWindow) {
-      printWindow.document.write(`
+      printWindow?.document.write(`
         <!DOCTYPE html>
         <html>
           <head>
@@ -527,7 +637,7 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
                     ${inverter.waveType ? `
                     <div class="spec-item">
                       <div class="label">Wave Type</div>
-                      <div class="value">${inverter.waveType.replace(/_/g, ' ')}</div>
+                      <div class="value">${formatReceiptLabel(inverter.waveType)}</div>
                     </div>
                     ` : ''}
                     ${inverter.inputVoltage ? `
@@ -730,8 +840,8 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
               
               <!-- Footer -->
               <div class="footer">
-                <p>Thank you for choosing Sun Powers Battery & Inverter Service</p>
-                <p>For any queries, contact: +91 9876543210 | support@sunpowers.com</p>
+                <p>Thank you for choosing Sun Office Battery & Inverter Service</p>
+                <p>For any queries, please contact the Sun Office service desk.</p>
                 <p style="margin-top: 15px; font-style: italic; color: #9ca3af;">This is a computer generated receipt - valid without signature</p>
               </div>
             </div>
@@ -748,7 +858,7 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
           </body>
         </html>
       `);
-      printWindow.document.close();
+      printWindow?.document.close();
     }
   };
 
