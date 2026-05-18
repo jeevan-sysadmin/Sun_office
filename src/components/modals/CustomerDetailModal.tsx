@@ -10,7 +10,6 @@ import {
   FiShoppingBag,
   FiEdit,
   FiFileText,
-  FiPhoneCall,
   FiMail,
   FiHome,
   FiStar,
@@ -83,7 +82,7 @@ const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
 
   // Calculate customer stats
   const totalServices = customer.total_services || customer.service_count || 0;
-  const hasAlternatePhone = customer.alternate_phone && customer.alternate_phone.toString().trim() !== '';
+  const hasMobile = customer.phone && customer.phone.toString().trim() !== '';
   const hasEmail = customer.email && customer.email.trim() !== '';
   const hasAddress = customer.address && customer.address.trim() !== '';
   const hasNotes = customer.notes && customer.notes.trim() !== '';
@@ -392,7 +391,7 @@ const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
                     cursor: 'pointer',
                     position: 'relative'
                   }}
-                  onClick={() => copyToClipboard(customer.phone, 'phone')}>
+                  onClick={() => hasMobile && copyToClipboard(customer.phone, 'phone')}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
                       <div style={{
                         width: '32px',
@@ -405,61 +404,10 @@ const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
                       }}>
                         <FiPhone size={16} color="white" />
                       </div>
-                      <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '500' }}>Primary Phone</span>
+                      <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '500' }}>Phone Number</span>
                     </div>
-                    <div style={{ fontSize: '16px', fontWeight: '600', color: '#0f172a' }}>{customer.phone}</div>
+                    <div style={{ fontSize: '16px', fontWeight: '600', color: hasMobile ? '#0f172a' : '#94a3b8' }}>{hasMobile ? customer.phone : 'Not provided'}</div>
                     {copiedField === 'phone' && (
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        style={{
-                          position: 'absolute',
-                          top: '8px',
-                          right: '12px',
-                          background: '#10b981',
-                          color: 'white',
-                          padding: '4px 8px',
-                          borderRadius: '6px',
-                          fontSize: '11px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px'
-                        }}
-                      >
-                        <FiCheck size={12} /> Copied
-                      </motion.div>
-                    )}
-                  </div>
-
-                  {/* Alternate Phone */}
-                  <div style={{
-                    background: 'white',
-                    borderRadius: '12px',
-                    padding: '16px',
-                    border: '1px solid #e2e8f0',
-                    opacity: hasAlternatePhone ? 1 : 0.6,
-                    cursor: hasAlternatePhone ? 'pointer' : 'default',
-                    position: 'relative'
-                  }}
-                  onClick={() => hasAlternatePhone && copyToClipboard(customer.alternate_phone!.toString(), 'altPhone')}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                      <div style={{
-                        width: '32px',
-                        height: '32px',
-                        borderRadius: '10px',
-                        background: hasAlternatePhone ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : '#cbd5e1',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}>
-                        <FiPhoneCall size={16} color="white" />
-                      </div>
-                      <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '500' }}>Alternate Phone</span>
-                    </div>
-                    <div style={{ fontSize: '16px', fontWeight: '600', color: hasAlternatePhone ? '#0f172a' : '#94a3b8' }}>
-                      {hasAlternatePhone ? customer.alternate_phone : 'Not provided'}
-                    </div>
-                    {copiedField === 'altPhone' && (
                       <motion.div
                         initial={{ opacity: 0, scale: 0.8 }}
                         animate={{ opacity: 1, scale: 1 }}

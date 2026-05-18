@@ -15,6 +15,12 @@ import {
   FiFileText
 } from 'react-icons/fi';
 import type { InverterService as SharedInverterService } from "../types";
+import {
+  badgeToneForStatus,
+  formatReceiptLabel,
+  openPrintReceipt,
+  type ReceiptSection,
+} from "../utils/receiptPrint";
 
 export type InverterService = SharedInverterService;
 
@@ -31,7 +37,7 @@ interface InverterServiceDetailModalProps {
 const InverterServiceDetailModal: React.FC<InverterServiceDetailModalProps> = ({
   isOpen,
   onClose,
-  service,
+  service: rawService,
   onEdit,
   getStatusColor,
   getPaymentStatusColor,
@@ -55,9 +61,11 @@ const InverterServiceDetailModal: React.FC<InverterServiceDetailModalProps> = ({
   const isTablet = windowWidth >= 640 && windowWidth < 1024;
 
   // Guard clause - if no service or not open, return null
-  if (!isOpen || !service) {
+  if (!isOpen || !rawService) {
     return null;
   }
+
+  const service = rawService;
 
   // Format currency
   const formatCurrency = (amount?: number | string) => {
@@ -111,9 +119,103 @@ const InverterServiceDetailModal: React.FC<InverterServiceDetailModalProps> = ({
 
   // Print receipt
   const printReceipt = () => {
+    const customerAddress = [
+      service.customer_address,
+      service.customer_city,
+      service.customer_state,
+      service.customer_zip ? `PIN ${service.customer_zip}` : null,
+    ]
+      .filter(Boolean)
+      .join(", ");
+
+    const finalAmount = formatCurrency(service.final_cost);
+    const sections: ReceiptSection[] = [
+      {
+        title: "Customer Details",
+        fields: [
+          { label: "Customer Name", value: service.customer_name || "N/A" },
+          { label: "Phone Number", value: service.customer_phone },
+          { label: "Email Address", value: service.customer_email || null },
+          { label: "Address", value: customerAddress || null, wide: true, multiline: true },
+        ],
+      },
+      {
+        title: "Inverter Details",
+        fields: [
+          { label: "Brand", value: service.inverter_brand || "N/A" },
+          { label: "Model", value: service.inverter_model || "N/A" },
+          { label: "Serial Number", value: service.inverter_serial || null },
+          { label: "Power Rating", value: service.inverter_power_rating || "N/A" },
+          { label: "Inverter Type", value: formatReceiptLabel(service.inverter_type) || null },
+          { label: "Wave Type", value: formatReceiptLabel(service.inverter_wave_type) || null },
+        ],
+      },
+      {
+        title: "Service Summary",
+        fields: [
+          { label: "Service Type", value: formatReceiptLabel(service.service_type) || "Inverter Service" },
+          { label: "Created On", value: formatDate(service.created_at) },
+          {
+            label: "Estimated Completion",
+            value: service.estimated_completion_date ? formatDateOnly(service.estimated_completion_date) : null,
+          },
+          { label: "Technician", value: service.staff_name || null },
+          { label: "Technician Email", value: service.staff_email || null },
+          {
+            label: "Issue Description",
+            value: service.issue_description || "No issue description provided.",
+            wide: true,
+            multiline: true,
+          },
+          { label: "Additional Notes", value: service.notes || null, wide: true, multiline: true },
+        ],
+      },
+    ];
+
+    const opened = openPrintReceipt({
+      documentTitle: `Inverter Service Receipt - ${service.service_code}`,
+      serviceLine: "Inverter Service",
+      receiptLabel: "Service Receipt",
+      code: service.service_code,
+      codeLabel: "Service Code",
+      issuedOn: formatDateOnly(service.created_at),
+      badges: [
+        {
+          label: `Status: ${formatReceiptLabel(service.status) || "Pending"}`,
+          tone: badgeToneForStatus(service.status),
+        },
+        {
+          label: `Warranty: ${formatReceiptLabel(service.warranty_status) || "Unknown"}`,
+          tone: badgeToneForStatus(service.warranty_status),
+        },
+        {
+          label: `AMC: ${formatReceiptLabel(service.amc_status) || "Unknown"}`,
+          tone: badgeToneForStatus(service.amc_status),
+        },
+        {
+          label: `Payment: ${formatReceiptLabel(service.payment_status) || "Pending"}`,
+          tone: badgeToneForStatus(service.payment_status),
+        },
+      ],
+      amount: {
+        label: "Final Amount",
+        value: finalAmount,
+      },
+      sections,
+      footerTitle: "Thank you for choosing Sun Office.",
+      footerNote: "Computer-generated inverter service receipt for Sun Office service records.",
+      signatureLabels: ["Customer", service.staff_name || "Authorized By"],
+    });
+
+    if (!opened) {
+      alert('Unable to start printing. Please try again.');
+    }
+
+    return;
+
     const printWindow = window.open('', '_blank');
     if (printWindow) {
-      printWindow.document.write(`
+      printWindow?.document.write(`
         <html>
           <head>
             <title>Inverter Service Receipt - ${service.service_code}</title>
@@ -281,7 +383,7 @@ const InverterServiceDetailModal: React.FC<InverterServiceDetailModalProps> = ({
           <body>
             <div class="receipt">
               <div class="header">
-                <h2>Sun Powers Inverter Service</h2>
+                <h2>Sun Office Inverter Service</h2>
                 <h3>Service Order Receipt</h3>
                 <p><strong>Service Code:</strong> ${service.service_code}</p>
                 <p><strong>Date:</strong> ${formatDateOnly(service.created_at)}</p>
@@ -412,9 +514,9 @@ const InverterServiceDetailModal: React.FC<InverterServiceDetailModalProps> = ({
               ` : ''}
               
               <div class="footer">
-                <p>Thank you for choosing Sun Powers Inverter Service</p>
+                <p>Thank you for choosing Sun Office Inverter Service</p>
                 <p>For any queries, contact: +91 9876543210</p>
-                <p>Email: support@sunpowers.com</p>
+                <p>Support: Sun Office service desk</p>
                 <p style="margin-top: 10px; font-style: italic; color: #94a3b8;">This is a computer generated receipt</p>
               </div>
             </div>
@@ -431,7 +533,7 @@ const InverterServiceDetailModal: React.FC<InverterServiceDetailModalProps> = ({
           </body>
         </html>
       `);
-      printWindow.document.close();
+      printWindow?.document.close();
     }
   };
 

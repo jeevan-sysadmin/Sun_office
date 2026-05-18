@@ -9,7 +9,6 @@ import {
   FiSave, 
   FiAlertCircle, 
   FiCheckCircle, 
-  FiPhoneCall,
   FiHome,
   FiGlobe,
   FiArrowRight,
@@ -60,7 +59,6 @@ const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
     full_name: "",
     email: "",
     phone: "",
-    alternate_phone: "",
     address: "",
     city: "",
     state: "",
@@ -75,21 +73,16 @@ const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string>("");
   const [activeStep, setActiveStep] = useState<'basic' | 'address' | 'notes'>('basic');
+  const getCleanContactNumber = (value: string) => value.replace(/\D/g, '');
 
   // Reset form when modal opens/closes or mode/data changes
   useEffect(() => {
     if (open) {
       if (mode === 'edit' && data) {
-        let alternatePhoneValue = "";
-        if (data.alternate_phone !== null && data.alternate_phone !== undefined) {
-          alternatePhoneValue = String(data.alternate_phone).trim();
-        }
-        
         setFormData({
           full_name: data.full_name || "",
           email: data.email || "",
           phone: data.phone || "",
-          alternate_phone: alternatePhoneValue,
           address: data.address || "",
           city: data.city || "",
           state: data.state || "",
@@ -101,7 +94,6 @@ const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
           full_name: "",
           email: "",
           phone: "",
-          alternate_phone: "",
           address: "",
           city: "",
           state: "",
@@ -128,15 +120,8 @@ const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
       
       case 'phone':
         if (!value.trim()) return "Phone number is required";
-        const cleanedPhone = value.replace(/\D/g, '');
-        if (cleanedPhone.length !== 10) return "Enter a valid 10-digit phone number";
-        return "";
-      
-      case 'alternate_phone':
-        if (value && value.trim()) {
-          const cleanedAltPhone = value.replace(/\D/g, '');
-          if (cleanedAltPhone.length !== 10) return "Enter a valid 10-digit alternate phone number";
-        }
+        const cleanedPhone = getCleanContactNumber(value);
+        if (cleanedPhone.length < 6 || cleanedPhone.length > 12) return "Enter a valid phone or landline number (6-12 digits)";
         return "";
       
       case 'email':
@@ -173,10 +158,6 @@ const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
       newErrors.phone = phoneError;
       isValid = false;
     }
-    
-    // Optional fields
-    const altPhoneError = validateField('alternate_phone', formData.alternate_phone);
-    if (altPhoneError) newErrors.alternate_phone = altPhoneError;
     
     const emailError = validateField('email', formData.email);
     if (emailError) newErrors.email = emailError;
@@ -226,14 +207,11 @@ const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
     
     try {
       const cleanedPhone = formData.phone.replace(/\D/g, '');
-      const cleanedAltPhone = formData.alternate_phone && formData.alternate_phone.trim() 
-        ? formData.alternate_phone.replace(/\D/g, '') 
-        : null;
       
       const customerData: any = {
         full_name: formData.full_name.trim(),
         phone: cleanedPhone,
-        alternate_phone: cleanedAltPhone,
+        alternate_phone: null,
         email: formData.email && formData.email.trim() ? formData.email.trim() : null,
         address: formData.address && formData.address.trim() ? formData.address.trim() : null,
         city: formData.city && formData.city.trim() ? formData.city.trim() : null,
@@ -646,7 +624,7 @@ const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                           name="phone"
                           value={formData.phone}
                           onChange={handleInputChange}
-                          placeholder="Enter 10-digit phone number"
+                          placeholder="Enter mobile or landline number"
                           disabled={loading}
                           style={{
                             width: "100%",
@@ -667,49 +645,6 @@ const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                         {errors.phone && touched.phone && (
                           <div style={{ color: "#ef4444", fontSize: "12px", marginTop: "6px" }}>
                             {errors.phone}
-                          </div>
-                        )}
-                      </div>
-
-                      <div style={{ marginBottom: "24px" }}>
-                        <label style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "8px",
-                          marginBottom: "8px",
-                          fontSize: "14px",
-                          fontWeight: "600",
-                          color: "#1e293b"
-                        }}>
-                          <FiPhoneCall size={16} />
-                          Alternate Phone
-                        </label>
-                        <input
-                          type="tel"
-                          name="alternate_phone"
-                          value={formData.alternate_phone}
-                          onChange={handleInputChange}
-                          placeholder="Enter alternate phone number"
-                          disabled={loading}
-                          style={{
-                            width: "100%",
-                            padding: "12px 16px",
-                            border: `2px solid ${errors.alternate_phone && touched.alternate_phone ? '#ef4444' : '#e2e8f0'}`,
-                            borderRadius: "12px",
-                            fontSize: "14px",
-                            transition: "all 0.2s",
-                            outline: "none",
-                            backgroundColor: loading ? "#f8fafc" : "white"
-                          }}
-                          onFocus={(e) => e.target.style.borderColor = "#667eea"}
-                          onBlur={(e) => {
-                            e.target.style.borderColor = errors.alternate_phone && touched.alternate_phone ? '#ef4444' : '#e2e8f0';
-                            handleBlur('alternate_phone');
-                          }}
-                        />
-                        {errors.alternate_phone && touched.alternate_phone && (
-                          <div style={{ color: "#ef4444", fontSize: "12px", marginTop: "6px" }}>
-                            {errors.alternate_phone}
                           </div>
                         )}
                       </div>

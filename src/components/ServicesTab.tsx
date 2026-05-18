@@ -26,6 +26,12 @@ import {
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import type { ServiceOrder } from "./types";
+import {
+  badgeToneForStatus,
+  formatReceiptLabel,
+  openPrintReceipt,
+  type ReceiptSection,
+} from "./utils/receiptPrint";
 
 // Create motion components properly to avoid deprecation warning
 const MotionDiv = motion.div;
@@ -389,75 +395,80 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
   // Print single receipt
   const printReceipt = (service: ServiceOrder) => {
     try {
-      const printWindow = window.open('', '_blank');
-      if (printWindow) {
-        const equipment = service.battery_model || service.inverter_model || 'N/A';
-        const equipmentSerial = service.battery_serial || service.inverter_serial || 'N/A';
-        
-        printWindow.document.write(`
-          <html>
-            <head>
-              <title>Receipt - ${service.service_code}</title>
-              <meta name="viewport" content="width=device-width, initial-scale=1.0">
-              <style>
-                body { font-family: 'Arial', sans-serif; padding: 20px; background: #fff; color: #333; margin: 0; }
-                .receipt { max-width: 400px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px; background: #fff; }
-                .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #10b981; padding-bottom: 10px; }
-                .header h2 { color: #10b981; margin: 0; font-size: 24px; }
-                .header h3 { color: #334155; margin: 10px 0; font-size: 18px; }
-                .section { margin: 15px 0; padding: 10px 0; border-bottom: 1px dashed #ddd; }
-                .section:last-child { border-bottom: none; }
-                .section h4 { color: #475569; margin: 0 0 10px 0; font-size: 14px; text-transform: uppercase; }
-                .section p { margin: 5px 0; font-size: 14px; }
-                .footer { text-align: center; margin-top: 30px; color: #666; font-size: 12px; }
-                @media print { body { padding: 0; } .receipt { border: none; } }
-                @media (max-width: 480px) {
-                  body { padding: 10px; }
-                  .receipt { padding: 15px; }
-                  .header h2 { font-size: 20px; }
-                }
-              </style>
-            </head>
-            <body>
-              <div class="receipt">
-                <div class="header">
-                  <h2>Sun Office</h2>
-                  <h3>Inverter & Battery Service</h3>
-                  <p><strong>Service Code:</strong> ${service.service_code}</p>
-                  <p><strong>Date:</strong> ${formatDate(service.created_at)}</p>
-                </div>
-                <div class="section">
-                  <h4>Customer Information</h4>
-                  <p><strong>Name:</strong> ${service.customer_name}</p>
-                  <p><strong>Phone:</strong> ${service.customer_phone}</p>
-                </div>
-                <div class="section">
-                  <h4>Service Call Details</h4>
-                  <p><strong>Issue:</strong> ${service.issue_description || 'No description'}</p>
-                  <p><strong>Status:</strong> ${service.status?.toUpperCase() || 'PENDING'}</p>
-                </div>
-                <div class="section">
-                  <h4>Equipment Details</h4>
-                  <p><strong>Model:</strong> ${equipment}</p>
-                  <p><strong>Serial:</strong> ${equipmentSerial}</p>
-                </div>
-                <div class="footer">
-                  <p>Thank you for choosing Sun Office!</p>
-                  <p>For queries: support@sunofficess.com</p>
-                </div>
-              </div>
-              <script>
-                window.onload = function() {
-                  setTimeout(function() {
-                    window.print();
-                    window.close();
-                  }, 500);
-                }
-              </script>
-            </body>
-          </html>
-        `);
-        printWindow.document.close();
+      const equipment = service.battery_model || service.inverter_model || 'N/A';
+      const equipmentSerial = service.battery_serial || service.inverter_serial || 'N/A';
+      const amountSource = service.final_cost || service.estimated_cost;
+      const amountNumber = amountSource ? Number(amountSource) : NaN;
+      const amountValue =
+        amountSource && !Number.isNaN(amountNumber)
+          ? new Intl.NumberFormat('en-IN', {
+              style: 'currency',
+              currency: 'INR',
+            }).format(amountNumber)
+          : null;
+      const sections: ReceiptSection[] = [
+        {
+          title: "Customer Details",
+          fields: [
+            { label: "Customer Name", value: service.customer_name },
+            { label: "Phone Number", value: service.customer_phone },
+            { label: "Email Address", value: service.customer_email || null },
+            {
+              label: "Address",
+              value: service.customer_address || null,
+              wide: true,
+              multiline: true,
+            },
+          ],
+        },
+        {
+          title: "Service Details",
+          fields: [
+            { label: "Service Type", value: formatReceiptLabel(service.service_type) || "General Service" },
+            { label: "Equipment", value: equipment },
+            { label: "Serial Number", value: equipmentSerial === 'N/A' ? null : equipmentSerial },
+            { label: "Created On", value: formatDate(service.created_at) },
+            {
+              label: "Issue Description",
+              value: service.issue_description || "No issue description provided.",
+              wide: true,
+              multiline: true,
+            },
+          ],
+        },
+      ];
+
+      const opened = openPrintReceipt({
+        documentTitle: `Receipt - ${service.service_code}`,
+        serviceLine: "Battery and Inverter Service",
+        receiptLabel: "Service Receipt",
+        code: service.service_code,
+        codeLabel: "Service Code",
+        issuedOn: formatDate(service.created_at),
+        badges: [
+          {
+            label: `Status: ${formatReceiptLabel(service.status) || "Pending"}`,
+            tone: badgeToneForStatus(service.status),
+          },
+          {
+            label: `Payment: ${formatReceiptLabel(service.payment_status) || "Pending"}`,
+            tone: badgeToneForStatus(service.payment_status),
+          },
+        ],
+        amount: amountValue
+          ? {
+              label: service.final_cost ? "Final Amount" : "Estimated Amount",
+              value: amountValue,
+            }
+          : null,
+        sections,
+        footerTitle: "Thank you for choosing Sun Office.",
+        footerNote: "Computer-generated receipt from the Sun Office service desk.",
+        signatureLabels: ["Customer", "Sun Office"],
+      });
+
+      if (!opened) {
+        alert('Unable to start printing. Please try again.');
       }
     } catch (error) {
       console.error('Print error:', error);

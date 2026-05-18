@@ -1014,7 +1014,7 @@ const StaffTab: React.FC<StaffTabProps> = ({
       </head>
       <body>
         <div class="header">
-          <h1>Sun Powers Battery Service</h1>
+          <h1>Sun Office Battery Service</h1>
           <h2>Staff Report</h2>
           <div class="metadata">
             <p><strong>Generated:</strong> ${new Date().toLocaleString()}</p>
@@ -1097,7 +1097,7 @@ const StaffTab: React.FC<StaffTabProps> = ({
 
         <div class="footer">
           <p>This is a computer generated document - valid without signature</p>
-          <p>Sun Powers Battery Service - All rights reserved</p>
+          <p>Sun Office Battery Service - All rights reserved</p>
         </div>
 
         <div class="no-print" style="text-align: center; margin-top: 20px;">

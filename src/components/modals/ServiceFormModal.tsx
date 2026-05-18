@@ -71,6 +71,11 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
   const [isFocused, setIsFocused] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const listboxId = `${id}-listbox`;
+  const errorId = `${id}-error`;
+  const hintId = `${id}-hint`;
+  const describedBy = [error ? errorId : null, hint ? hintId : null].filter(Boolean).join(' ') || undefined;
+  const hasValue = value !== null && value !== undefined && value !== '';
 
   // Get selected option display text
   const getSelectedDisplayText = () => {
@@ -178,7 +183,24 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
           onClick={() => !disabled && !loading && setIsOpen(!isOpen)}
           onFocus={() => setIsFocused(true)}
           onBlur={() => !isOpen && setIsFocused(false)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              setIsOpen(false);
+              setSearchTerm('');
+              setIsFocused(false);
+            }
+            if (!isOpen && (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ')) {
+              e.preventDefault();
+              setIsOpen(true);
+            }
+          }}
           disabled={disabled || loading}
+          aria-haspopup="listbox"
+          aria-expanded={isOpen}
+          aria-controls={listboxId}
+          aria-invalid={!!error}
+          aria-required={required}
+          aria-describedby={describedBy}
           whileTap={{ scale: 0.98 }}
           animate={{
             borderColor: error ? '#ef4444' : isFocused ? '#8b5cf6' : success ? '#10b981' : '#e5e7eb',
@@ -188,20 +210,20 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
           style={{
             width: '100%',
             padding: isMobile ? '14px 16px' : '12px 16px',
-            paddingRight: value && allowEmpty ? '80px' : '48px',
+            paddingRight: hasValue && allowEmpty ? '80px' : '48px',
             borderRadius: '12px',
             border: '2px solid',
             fontSize: isMobile ? '15px' : '14px',
             backgroundColor: disabled ? '#f9fafb' : '#fff',
             textAlign: 'left',
             cursor: disabled ? 'not-allowed' : 'pointer',
-            color: value ? '#111827' : '#9ca3af',
+            color: hasValue ? '#111827' : '#9ca3af',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             position: 'relative',
             transition: 'all 0.2s ease',
-            fontWeight: value ? '500' : '400',
+            fontWeight: hasValue ? '500' : '400',
             boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
           }}
         >
@@ -223,8 +245,9 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
           </span>
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {value && allowEmpty && !disabled && (
-              <motion.span
+            {hasValue && allowEmpty && !disabled && (
+              <motion.button
+                type="button"
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 exit={{ scale: 0 }}
@@ -240,14 +263,17 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                   color: '#6b7280',
                   fontSize: '16px',
                   cursor: 'pointer',
-                  transition: 'all 0.2s'
+                  transition: 'all 0.2s',
+                  border: 'none',
+                  padding: 0
                 }}
                 whileHover={{ backgroundColor: '#fee2e2', color: '#ef4444', rotate: 90 }}
                 whileTap={{ scale: 0.9 }}
                 title="Clear selection"
+                aria-label="Clear selection"
               >
-                ×
-              </motion.span>
+                <FiX size={12} />
+              </motion.button>
             )}
             
             {loading ? (
@@ -264,7 +290,7 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
         </motion.button>
 
         {/* Success/Error Icons */}
-        {!loading && success && !error && value && (
+        {!loading && success && !error && hasValue && (
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
@@ -301,6 +327,9 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
           {isOpen && !disabled && !loading && (
             <motion.div
               className="dropdown-menu"
+              id={listboxId}
+              role="listbox"
+              aria-label={label}
               initial={{ opacity: 0, y: -10, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -10, scale: 0.95 }}
@@ -339,6 +368,7 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   onClick={(e) => e.stopPropagation()}
+                  aria-label={`Search ${label}`}
                   style={{
                     width: '100%',
                     border: 'none',
@@ -351,6 +381,7 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                 />
                 {searchTerm && (
                   <motion.button
+                    type="button"
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
                     onClick={() => setSearchTerm('')}
@@ -361,8 +392,9 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                       cursor: 'pointer',
                       padding: '4px'
                     }}
+                    aria-label="Clear search"
                   >
-                    ×
+                    <FiX size={12} />
                   </motion.button>
                 )}
               </div>
@@ -394,6 +426,8 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                 {allowEmpty && (
                   <motion.div
                     className="dropdown-option"
+                    role="option"
+                    aria-selected={!value}
                     onClick={() => {
                       const syntheticEvent = {
                         target: {
@@ -429,12 +463,14 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                 {filteredOptions.length > 0 ? (
                   filteredOptions.map((option, index) => {
                     const optionVal = optionValue(option).toString();
-                    const isSelected = value && value.toString() === optionVal;
+                    const isSelected = Boolean(value && value.toString() === optionVal);
                     
                     return (
                       <motion.div
                         key={index}
                         className="dropdown-option"
+                        role="option"
+                        aria-selected={isSelected}
                         onClick={() => handleSelectOption(option)}
                         whileHover={{ backgroundColor: '#f9fafb', x: 4 }}
                         style={{
@@ -492,6 +528,7 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
       <AnimatePresence>
         {error && (
           <motion.small
+            id={errorId}
             initial={{ opacity: 0, y: -10, height: 0 }}
             animate={{ opacity: 1, y: 0, height: 'auto' }}
             exit={{ opacity: 0, y: -10, height: 0 }}
@@ -512,6 +549,7 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
       {/* Hint */}
       {hint && !error && (
         <motion.small
+          id={hintId}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           className="form-hint"
@@ -609,6 +647,13 @@ const getInverterLabel = (inverter: Inverter): string => {
 // Helper function to get staff label
 const getStaffLabel = (staff: any): string => {
   return `${staff.name}${staff.role ? ` (${staff.role})` : ''}`;
+};
+
+const formatShortDate = (value?: string): string => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }).format(date);
 };
 
 const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
@@ -1248,6 +1293,111 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
     return editMode ? 'Update the service call details below' : 'Fill in the details to create a new service call';
   };
 
+  const resolveId = (value: any): number | null => {
+    if (value === null || value === undefined || value === '') return null;
+    const parsed = Number(value);
+    return Number.isNaN(parsed) ? null : parsed;
+  };
+
+  const selectedCustomer = localCustomers.find((customer) => customer.id === resolveId(serviceForm.customer_id));
+  const selectedBattery = localBatteries.find((battery) => battery.id === resolveId(serviceForm.battery_id));
+  const selectedInverter = localInverters.find((inverter) => inverter.id === resolveId(serviceForm.inverter_id));
+  const selectedStaffMember = localStaff.find((staff) => staff.id === resolveId(serviceForm.service_staff_id));
+
+  const warrantyLabels: Record<string, string> = {
+    in_warranty: 'In Warranty',
+    extended_warranty: 'Extended Warranty',
+    out_of_warranty: 'Out of Warranty'
+  };
+
+  const amcLabels: Record<string, string> = {
+    active: 'Active',
+    expired: 'Expired',
+    no_amc: 'No AMC'
+  };
+
+  const warrantyStatusLabel = serviceForm.warranty_status
+    ? (warrantyLabels[serviceForm.warranty_status] || 'Unknown')
+    : 'Not set';
+  const amcStatusValue = serviceForm.amc_status || 'active';
+  const amcStatusLabel = amcLabels[amcStatusValue] || 'Unknown';
+  const warrantyTone = serviceForm.warranty_status === 'in_warranty'
+    ? 'ok'
+    : serviceForm.warranty_status === 'extended_warranty'
+      ? 'warn'
+      : serviceForm.warranty_status === 'out_of_warranty'
+        ? 'danger'
+        : 'muted';
+  const amcTone = amcStatusValue === 'active'
+    ? 'ok'
+    : amcStatusValue === 'expired'
+      ? 'danger'
+      : amcStatusValue === 'no_amc'
+        ? 'muted'
+        : 'muted';
+  const formattedEta = serviceForm.estimated_completion_date
+    ? formatShortDate(serviceForm.estimated_completion_date)
+    : '';
+
+  const missingRequired = [
+    !serviceForm.customer_id ? 'Client' : null,
+    !serviceForm.customer_phone ? 'Mobile' : null,
+    !serviceForm.warranty_status ? 'Warranty' : null
+  ].filter(Boolean) as string[];
+
+  const requiredTotal = 3;
+  const requiredCompleted = Math.min(requiredTotal, requiredTotal - missingRequired.length);
+  const completionTone = missingRequired.length === 0 ? 'ok' : 'warn';
+  const completionMessage = missingRequired.length === 0
+    ? 'All required fields complete'
+    : `Missing: ${missingRequired.join(', ')}`;
+
+  const summaryItems = [
+    {
+      label: 'Client',
+      value: selectedCustomer ? selectedCustomer.full_name : 'Not selected',
+      sub: serviceForm.customer_phone || selectedCustomer?.phone || '',
+      icon: <FiUser />,
+      muted: !selectedCustomer
+    },
+    {
+      label: 'Battery',
+      value: selectedBattery ? getBatteryLabel(selectedBattery) : 'Not set',
+      icon: <FiBattery />,
+      muted: !selectedBattery
+    },
+    {
+      label: 'Inverter',
+      value: selectedInverter ? getInverterLabel(selectedInverter) : 'Not set',
+      icon: <FiPower />,
+      muted: !selectedInverter
+    },
+    {
+      label: 'Assigned Staff',
+      value: selectedStaffMember ? getStaffLabel(selectedStaffMember) : 'Not assigned',
+      icon: <FiUser />,
+      muted: !selectedStaffMember
+    },
+    {
+      label: 'Warranty',
+      value: warrantyStatusLabel,
+      icon: <FiTag />,
+      tone: warrantyTone
+    },
+    {
+      label: 'AMC',
+      value: amcStatusLabel,
+      icon: <FiClock />,
+      tone: amcTone
+    },
+    {
+      label: 'ETA',
+      value: formattedEta || 'Not set',
+      icon: <FiCalendar />,
+      muted: !formattedEta
+    }
+  ];
+
   // Handle refresh
   const handleRefresh = () => {
     setIsInitialized(false);
@@ -1299,8 +1449,10 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
                 borderRadius: '8px',
                 flexShrink: 0
               }}
+              aria-label="Dismiss error"
+              title="Dismiss error"
             >
-              ×
+              <FiX size={16} />
             </motion.button>
           </motion.div>
         )}
@@ -1362,31 +1514,74 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
         />
       )}
 
-      {/* Progress Bar */}
-      {!editMode && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          style={{
-            marginBottom: '24px',
-            background: '#f3f4f6',
-            borderRadius: '12px',
-            height: '8px',
-            overflow: 'hidden'
-          }}
-        >
-          <motion.div
-            initial={{ width: 0 }}
-            animate={{ width: `${formProgress}%` }}
-            transition={{ duration: 0.5 }}
-            style={{
-              height: '100%',
-              background: 'linear-gradient(90deg, #8b5cf6 0%, #6366f1 100%)',
-              borderRadius: '12px'
-            }}
-          />
-        </motion.div>
-      )}
+      {/* Summary */}
+      <motion.div
+        className="service-summary"
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+      >
+        <div className="summary-header">
+          <div className="summary-title">
+            <span className="summary-icon">
+              <FiFileText />
+            </span>
+            <div>
+              <h3>Service Snapshot</h3>
+              <p>
+                {editMode
+                  ? 'Review the key details before saving your changes.'
+                  : 'Complete the required fields to finish this service call.'}
+              </p>
+            </div>
+          </div>
+          <span className={`summary-pill summary-pill--${completionTone}`}>
+            {completionMessage}
+          </span>
+        </div>
+
+        {!editMode && (
+          <div className="summary-progress">
+            <div className="summary-progress-bar">
+              <motion.div
+                className="summary-progress-fill"
+                initial={{ width: 0 }}
+                animate={{ width: `${formProgress}%` }}
+                transition={{ duration: 0.5 }}
+              />
+            </div>
+            <div className="summary-progress-meta">
+              <span>{formProgress}% complete</span>
+              <span>{requiredCompleted} of {requiredTotal} required fields</span>
+            </div>
+          </div>
+        )}
+
+        <div className="summary-grid">
+          {summaryItems.map((item) => (
+            <div key={item.label} className="summary-item">
+              <div className="summary-label">
+                <span className="summary-item-icon">{item.icon}</span>
+                {item.label}
+              </div>
+              {item.tone ? (
+                <span className={`summary-pill summary-pill--${item.tone}`}>
+                  {item.value}
+                </span>
+              ) : (
+                <div className={`summary-value${item.muted ? ' muted' : ''}`} title={item.value}>
+                  {item.value}
+                </div>
+              )}
+              {item.sub ? (
+                <div className="summary-sub" title={item.sub}>
+                  {item.sub}
+                </div>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      </motion.div>
 
       {/* Tab Navigation for Mobile */}
       {isMobile && (
@@ -1443,7 +1638,7 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
       <div className="form-grid" style={{
         display: 'grid',
         gridTemplateColumns: isMobile ? '1fr' : isTablet ? 'repeat(2, 1fr)' : 'repeat(2, 1fr)',
-        gap: isMobile ? '0' : '20px',
+        gap: isMobile ? '16px' : '20px',
         marginBottom: '20px'
       }}>
         {/* Main Details Section */}
@@ -1456,6 +1651,20 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
             animate={{ opacity: 1 }}
             transition={{ delay: 0.1 }}
           >
+            <div className="section-card" role="group" aria-labelledby="service-main-title">
+              <div className="section-header">
+                <div className="section-title">
+                  <span className="section-icon">
+                    <FiUser />
+                  </span>
+                  <div>
+                    <h4 id="service-main-title">Client & Equipment</h4>
+                    <p>Choose who the service is for and the related hardware.</p>
+                  </div>
+                </div>
+                <span className="section-badge">Required: Client, Mobile</span>
+              </div>
+              <div className="section-content">
             {/* Customer Selection */}
             <SearchableDropdown
               id="customer_id"
@@ -1509,9 +1718,15 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
                   value={serviceForm.customer_phone}
                   onChange={handlePhoneChange}
                   placeholder="Enter 10-digit mobile number"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={10}
+                  autoComplete="tel"
                   required
                   readOnly={!!serviceForm.customer_id && !editMode}
                   disabled={loadingData.service}
+                  aria-invalid={!!validationErrors.customer_phone}
+                  aria-describedby={validationErrors.customer_phone ? 'customer_phone-error' : undefined}
                   style={{
                     width: '100%',
                     padding: isMobile ? '14px 16px' : '12px 16px',
@@ -1541,6 +1756,7 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
               </motion.div>
               {validationErrors.customer_phone && (
                 <motion.small
+                  id="customer_phone-error"
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
                   style={{
@@ -1635,6 +1851,8 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
               isMobile={isMobile}
               allowEmpty={true}
             />
+              </div>
+            </div>
           </motion.div>
         </div>
 
@@ -1648,6 +1866,20 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3 }}
           >
+            <div className="section-card" role="group" aria-labelledby="service-additional-title">
+              <div className="section-header">
+                <div className="section-title">
+                  <span className="section-icon">
+                    <FiTag />
+                  </span>
+                  <div>
+                    <h4 id="service-additional-title">Service Details</h4>
+                    <p>Warranty, AMC status, expected completion, and notes.</p>
+                  </div>
+                </div>
+                <span className="section-badge">Required: Warranty</span>
+              </div>
+              <div className="section-content">
             {/* Warranty Status */}
             <div className="form-group" style={{ marginBottom: '20px' }}>
               <motion.label 
@@ -1680,6 +1912,8 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
                   onChange={handleWarrantyChange}
                   required
                   disabled={loadingData.service}
+                  aria-invalid={!!validationErrors.warranty_status}
+                  aria-describedby={validationErrors.warranty_status ? 'warranty_status-error' : undefined}
                   style={{
                     width: '100%',
                     padding: isMobile ? '14px 16px' : '12px 16px',
@@ -1720,6 +1954,7 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
               </motion.div>
               {validationErrors.warranty_status && (
                 <motion.small
+                  id="warranty_status-error"
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
                   style={{
@@ -1912,6 +2147,8 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
                 />
               </motion.div>
             </div>
+              </div>
+            </div>
           </motion.div>
         </div>
       </div>
@@ -1928,8 +2165,15 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
           justifyContent: 'flex-end',
           gap: isMobile ? '12px' : '16px',
           paddingTop: '24px',
+          paddingBottom: isMobile ? '16px' : '20px',
           borderTop: '2px solid #f3f4f6',
-          marginTop: '20px'
+          marginTop: '20px',
+          position: 'sticky',
+          bottom: 0,
+          background: 'rgba(255, 255, 255, 0.95)',
+          backdropFilter: 'blur(8px)',
+          zIndex: 10,
+          boxShadow: '0 -12px 24px -22px rgba(15, 23, 42, 0.45)'
         }}
       >
         <motion.button
@@ -2174,7 +2418,258 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
         .spinning {
           animation: spin 1s linear infinite;
         }
-        
+
+        .service-summary {
+          border: 1px solid #e5e7eb;
+          border-radius: 18px;
+          padding: 18px 18px 16px;
+          margin-bottom: 24px;
+          background: linear-gradient(135deg, rgba(139, 92, 246, 0.08), rgba(99, 102, 241, 0.04)), #ffffff;
+          box-shadow: 0 12px 24px -18px rgba(15, 23, 42, 0.4);
+          position: relative;
+          overflow: hidden;
+        }
+
+        .service-summary::after {
+          content: '';
+          position: absolute;
+          right: -40px;
+          top: -40px;
+          width: 160px;
+          height: 160px;
+          background: radial-gradient(circle, rgba(139, 92, 246, 0.25), transparent 65%);
+          opacity: 0.6;
+          pointer-events: none;
+        }
+
+        .summary-header {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 12px;
+          align-items: center;
+          justify-content: space-between;
+          position: relative;
+          z-index: 1;
+        }
+
+        .summary-title {
+          display: flex;
+          gap: 12px;
+          align-items: center;
+        }
+
+        .summary-title h3 {
+          margin: 0;
+          font-size: 18px;
+          color: #111827;
+        }
+
+        .summary-title p {
+          margin: 4px 0 0;
+          font-size: 13px;
+          color: #6b7280;
+        }
+
+        .summary-icon {
+          width: 38px;
+          height: 38px;
+          border-radius: 12px;
+          background: #ede9fe;
+          color: #7c3aed;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 8px 16px -12px rgba(124, 58, 237, 0.45);
+        }
+
+        .summary-progress {
+          margin-top: 12px;
+          display: grid;
+          gap: 8px;
+          position: relative;
+          z-index: 1;
+        }
+
+        .summary-progress-bar {
+          width: 100%;
+          height: 8px;
+          border-radius: 999px;
+          background: #e5e7eb;
+          overflow: hidden;
+        }
+
+        .summary-progress-fill {
+          height: 100%;
+          border-radius: 999px;
+          background: linear-gradient(90deg, #8b5cf6 0%, #6366f1 100%);
+        }
+
+        .summary-progress-meta {
+          display: flex;
+          justify-content: space-between;
+          font-size: 12px;
+          color: #6b7280;
+        }
+
+        .summary-grid {
+          margin-top: 16px;
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+          gap: 12px;
+          position: relative;
+          z-index: 1;
+        }
+
+        .summary-item {
+          background: #ffffff;
+          border: 1px solid #f3f4f6;
+          border-radius: 14px;
+          padding: 12px;
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          box-shadow: 0 8px 18px -16px rgba(15, 23, 42, 0.4);
+          min-height: 78px;
+        }
+
+        .summary-label {
+          font-size: 11px;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+          color: #6b7280;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+
+        .summary-item-icon {
+          color: #8b5cf6;
+          display: inline-flex;
+          font-size: 14px;
+        }
+
+        .summary-value {
+          font-size: 14px;
+          font-weight: 600;
+          color: #111827;
+          line-height: 1.3;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+        }
+
+        .summary-value.muted {
+          color: #9ca3af;
+          font-weight: 500;
+        }
+
+        .summary-sub {
+          font-size: 12px;
+          color: #6b7280;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .summary-pill {
+          display: inline-flex;
+          align-items: center;
+          padding: 4px 10px;
+          border-radius: 999px;
+          font-size: 12px;
+          font-weight: 600;
+          border: 1px solid transparent;
+          background: #f3f4f6;
+          color: #374151;
+          white-space: nowrap;
+        }
+
+        .summary-pill--ok {
+          background: #ecfdf3;
+          color: #065f46;
+          border-color: #a7f3d0;
+        }
+
+        .summary-pill--warn {
+          background: #fff7ed;
+          color: #9a3412;
+          border-color: #fed7aa;
+        }
+
+        .summary-pill--danger {
+          background: #fef2f2;
+          color: #991b1b;
+          border-color: #fecaca;
+        }
+
+        .summary-pill--muted {
+          background: #f3f4f6;
+          color: #6b7280;
+          border-color: #e5e7eb;
+        }
+
+        .section-card {
+          border: 1px solid #f3f4f6;
+          border-radius: 18px;
+          padding: 18px;
+          background: #ffffff;
+          box-shadow: 0 10px 20px -18px rgba(15, 23, 42, 0.4);
+        }
+
+        .section-header {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          margin-bottom: 16px;
+        }
+
+        .section-title {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .section-title h4 {
+          margin: 0;
+          font-size: 16px;
+          color: #111827;
+        }
+
+        .section-title p {
+          margin: 4px 0 0;
+          font-size: 13px;
+          color: #6b7280;
+        }
+
+        .section-icon {
+          width: 36px;
+          height: 36px;
+          border-radius: 12px;
+          background: #eef2ff;
+          color: #6366f1;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .section-badge {
+          font-size: 12px;
+          font-weight: 600;
+          color: #6b7280;
+          background: #f9fafb;
+          padding: 4px 10px;
+          border-radius: 999px;
+          border: 1px solid #e5e7eb;
+          white-space: nowrap;
+        }
+
+        .section-content .form-group:last-child {
+          margin-bottom: 0;
+        }
+
         /* Custom scrollbar */
         .modal-content::-webkit-scrollbar {
           width: 8px;
@@ -2202,6 +2697,18 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
           
           .form-group {
             margin-bottom: 16px;
+          }
+
+          .service-summary {
+            padding: 16px;
+          }
+
+          .summary-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .section-card {
+            padding: 16px;
           }
         }
         

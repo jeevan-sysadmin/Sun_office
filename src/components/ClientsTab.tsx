@@ -58,6 +58,7 @@ const ClientsTab: React.FC<ClientsTabProps> = ({
   loading = false,
   showSnackbar
 }) => {
+  void onViewCustomer;
   // Date filter states
   const [dateFilterType, setDateFilterType] = useState<string>("all");
   const [fromDate, setFromDate] = useState<string>("");
@@ -165,6 +166,12 @@ const ClientsTab: React.FC<ClientsTabProps> = ({
     }
   };
 
+  const getContactNumber = (customer: Customer): string => {
+    const mobile = customer.phone?.toString().trim();
+    const landline = customer.alternate_phone?.toString().trim();
+    return mobile || landline || 'N/A';
+  };
+
   // Format date for filename
   const formatDateForFilename = () => {
     const date = new Date();
@@ -253,6 +260,7 @@ const ClientsTab: React.FC<ClientsTabProps> = ({
           (customer.customer_code && customer.customer_code.toLowerCase().includes(term)) ||
           (customer.full_name && customer.full_name.toLowerCase().includes(term)) ||
           (customer.phone && customer.phone.toLowerCase().includes(term)) ||
+          (customer.alternate_phone && customer.alternate_phone.toLowerCase().includes(term)) ||
           (customer.email && customer.email.toLowerCase().includes(term)) ||
           (customer.city && customer.city.toLowerCase().includes(term)) ||
           (customer.state && customer.state.toLowerCase().includes(term)) ||
@@ -517,7 +525,6 @@ const ClientsTab: React.FC<ClientsTabProps> = ({
     // Set selected customer and open detail modal
     setSelectedCustomer(customer);
     setShowDetailModal(true);
-    onViewCustomer(customer);
     
     // Reset action in progress after a short delay
     setTimeout(() => {
@@ -613,7 +620,7 @@ const ClientsTab: React.FC<ClientsTabProps> = ({
       const exportData = dataToExport.map(customer => ({
         'Client Code': customer.customer_code,
         'Full Name': customer.full_name,
-        'Phone': customer.phone,
+        'Phone Number': getContactNumber(customer),
         'Email': customer.email || '',
         'Address': customer.address || '',
         'City': customer.city || '',
@@ -704,19 +711,19 @@ const ClientsTab: React.FC<ClientsTabProps> = ({
       let tableRows: any[][];
 
       if (isMobile) {
-        tableColumn = ['Code', 'Name', 'Phone', 'Services'];
+        tableColumn = ['Code', 'Name', 'Phone Number', 'Services'];
         tableRows = dataToExport.map(customer => [
           customer.customer_code,
           customer.full_name,
-          customer.phone,
+          getContactNumber(customer),
           customer.total_services || '0'
         ]);
       } else {
-        tableColumn = ['Code', 'Name', 'Phone', 'Email', 'City', 'State', 'Services', 'Created'];
+        tableColumn = ['Code', 'Name', 'Phone Number', 'Email', 'City', 'State', 'Services', 'Created'];
         tableRows = dataToExport.map(customer => [
           customer.customer_code,
           customer.full_name,
-          customer.phone,
+          getContactNumber(customer),
           customer.email || '-',
           customer.city || '-',
           customer.state || '-',
@@ -871,7 +878,7 @@ const ClientsTab: React.FC<ClientsTabProps> = ({
           <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '4px' }}>Name</div>
           <div style={{ fontWeight: '500', fontSize: '14px' }}>{customer.full_name}</div>
           <div style={{ fontSize: '12px', color: '#6b7280', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <FiPhone size={10} /> {customer.phone}
+            <FiPhone size={10} /> {getContactNumber(customer)}
           </div>
         </div>
         <div>
@@ -2145,7 +2152,7 @@ const ClientsTab: React.FC<ClientsTabProps> = ({
                       <td style={{ padding: isTablet ? '12px' : '14px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <FiPhone style={{ color: '#10b981', fontSize: isTablet ? '12px' : '13px' }} />
-                          <span style={{ fontSize: isTablet ? '12px' : '13px' }}>{customer.phone}</span>
+                          <span style={{ fontSize: isTablet ? '12px' : '13px' }}>{getContactNumber(customer)}</span>
                         </div>
                       </td>
                       <td style={{ padding: isTablet ? '12px' : '14px' }}>
