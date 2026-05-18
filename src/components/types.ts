@@ -36,14 +36,16 @@ export interface ServiceOrder {
   customer_email?: string;
   customer_phone: string;
   customer_address?: string;
-  battery_id: number;
+  battery_id: number | null;
+  battery_ids?: number[];
   battery_model: string;
   battery_serial: string;
   battery_brand: string;
   battery_capacity: string;
   battery_voltage: string;
   battery_type: string;
-  inverter_id?: number;
+  inverter_id?: number | null;
+  inverter_ids?: number[];
   inverter_model: string;
   inverter_serial: string;
   inverter_brand?: string;
@@ -111,6 +113,24 @@ export interface ServiceOrder {
   purchase_date?: string;
   installation_date?: string;
   battery_warranty?: string;
+  batteries?: Array<{
+    id: number;
+    battery_model?: string;
+    battery_serial?: string;
+    brand?: string;
+    capacity?: string;
+    voltage?: string;
+    battery_type?: string;
+  }>;
+  inverters?: Array<{
+    id: number;
+    inverter_model?: string;
+    inverter_serial?: string;
+    inverter_brand?: string;
+    power_rating?: string;
+    wave_type?: string;
+    battery_voltage?: string;
+  }>;
 }
 
 export interface InverterService {

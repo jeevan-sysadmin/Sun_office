@@ -1,4 +1,4 @@
-// src/components/modals/ServiceDetailModal.tsx
+﻿// src/components/modals/ServiceDetailModal.tsx
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
@@ -14,12 +14,9 @@ import {
   FiMail,
   FiMapPin,
   FiUsers,
-  FiPackage,
-  FiHash,
   FiTag,
   FiClock,
   FiAlertCircle,
-  FiCpu,
 } from "react-icons/fi";
 import type { ServiceOrder } from "../types";
 import {
@@ -178,6 +175,40 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
     };
   };
 
+  const getBatteryList = () => {
+    const list = Array.isArray((service as any).batteries) ? (service as any).batteries : [];
+    if (list.length > 0) return list;
+    if (service.battery_model || service.battery_serial || service.battery_id) {
+      return [{
+        id: service.battery_id || null,
+        battery_model: service.battery_model || null,
+        battery_serial: service.battery_serial || null,
+        brand: service.battery_brand || null,
+        capacity: service.battery_capacity || null,
+        voltage: service.battery_voltage || null,
+        battery_type: service.battery_type || null
+      }];
+    }
+    return [];
+  };
+
+  const getInverterList = () => {
+    const list = Array.isArray((service as any).inverters) ? (service as any).inverters : [];
+    if (list.length > 0) return list;
+    if (service.inverter_model || service.inverter_serial || service.inverter_id) {
+      return [{
+        id: service.inverter_id || null,
+        inverter_model: service.inverter_model || null,
+        inverter_serial: service.inverter_serial || null,
+        inverter_brand: service.inverter_brand || null,
+        power_rating: service.inverter_power_rating || service.inverter_capacity || null,
+        wave_type: service.inverter_wave_type || null,
+        battery_voltage: service.inverter_battery_voltage || null
+      }];
+    }
+    return [];
+  };
+
   // Enhanced print receipt with all inverter data
   const printReceipt = () => {
     const { staffName, staffEmail, staffPhone, staffRole } = getStaffInfo();
@@ -202,7 +233,7 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
         ],
       },
       {
-        title: "Equipment Details",
+        title: "Product Details",
         fields: [
           { label: "Battery Model", value: battery.model },
           { label: "Battery Serial", value: battery.serial },
@@ -509,7 +540,7 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
             <div class="receipt">
               <!-- Header -->
               <div class="header">
-                <h2>⚡ SUN POWERS</h2>
+                <h2>âš¡ SUN POWERS</h2>
                 <h3>Battery & Inverter Service</h3>
                 <div class="badge">Service Order Receipt</div>
                 <p style="margin-top: 15px;"><strong>Service Code:</strong> ${service.service_code}</p>
@@ -520,20 +551,20 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
               <!-- Customer Information -->
               <div class="section">
                 <div class="section-title">
-                  <span>👤</span> Customer Information
+                  <span>ðŸ‘¤</span> Customer Information
                 </div>
                 <div class="grid">
                   <div class="info-item">
-                    <div class="label">📋 Name</div>
+                    <div class="label">ðŸ“‹ Name</div>
                     <div class="value">${service.customer_name}</div>
                   </div>
                   <div class="info-item">
-                    <div class="label">📞 Phone</div>
+                    <div class="label">ðŸ“ž Phone</div>
                     <div class="value">${service.customer_phone}</div>
                   </div>
                   ${service.customer_email ? `
                   <div class="info-item">
-                    <div class="label">✉️ Email</div>
+                    <div class="label">âœ‰ï¸ Email</div>
                     <div class="value">${service.customer_email}</div>
                   </div>
                   ` : ''}
@@ -544,40 +575,40 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
               ${battery.model ? `
               <div class="section">
                 <div class="section-title">
-                  <span>🔋</span> Battery Details
+                  <span>ðŸ”‹</span> Battery Details
                 </div>
                 <div class="grid">
                   ${battery.code ? `
                   <div class="info-item">
-                    <div class="label">🔑 Code</div>
+                    <div class="label">ðŸ”‘ Code</div>
                     <div class="value">${battery.code}</div>
                   </div>
                   ` : ''}
                   <div class="info-item">
-                    <div class="label">📊 Model</div>
+                    <div class="label">ðŸ“Š Model</div>
                     <div class="value">${battery.model}</div>
                   </div>
                   ${battery.serial ? `
                   <div class="info-item">
-                    <div class="label">🔢 Serial</div>
+                    <div class="label">ðŸ”¢ Serial</div>
                     <div class="value">${battery.serial}</div>
                   </div>
                   ` : ''}
                   ${battery.brand ? `
                   <div class="info-item">
-                    <div class="label">🏭 Brand</div>
+                    <div class="label">ðŸ­ Brand</div>
                     <div class="value">${battery.brand}</div>
                   </div>
                   ` : ''}
                   ${battery.capacity ? `
                   <div class="info-item">
-                    <div class="label">📈 Capacity</div>
+                    <div class="label">ðŸ“ˆ Capacity</div>
                     <div class="value">${battery.capacity}</div>
                   </div>
                   ` : ''}
                   ${battery.type ? `
                   <div class="info-item">
-                    <div class="label">⚡ Type</div>
+                    <div class="label">âš¡ Type</div>
                     <div class="value">${battery.type}</div>
                   </div>
                   ` : ''}
@@ -589,30 +620,30 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
               ${inverter.model ? `
               <div class="section">
                 <div class="section-title">
-                  <span>⚡</span> Inverter Details
+                  <span>âš¡</span> Inverter Details
                 </div>
                 
                 <!-- Basic Info -->
                 <div class="grid" style="margin-bottom: 15px;">
                   ${inverter.code ? `
                   <div class="info-item">
-                    <div class="label">🔑 Inverter Code</div>
+                    <div class="label">ðŸ”‘ Inverter Code</div>
                     <div class="value">${inverter.code}</div>
                   </div>
                   ` : ''}
                   <div class="info-item">
-                    <div class="label">📊 Model</div>
+                    <div class="label">ðŸ“Š Model</div>
                     <div class="value">${inverter.model}</div>
                   </div>
                   ${inverter.serial ? `
                   <div class="info-item">
-                    <div class="label">🔢 Serial Number</div>
+                    <div class="label">ðŸ”¢ Serial Number</div>
                     <div class="value">${inverter.serial}</div>
                   </div>
                   ` : ''}
                   ${inverter.brand ? `
                   <div class="info-item">
-                    <div class="label">🏭 Brand</div>
+                    <div class="label">ðŸ­ Brand</div>
                     <div class="value">${inverter.brand}</div>
                   </div>
                   ` : ''}
@@ -620,7 +651,7 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
                 
                 <!-- Specifications -->
                 <div style="margin-top: 15px;">
-                  <div style="font-weight: 600; color: #374151; margin-bottom: 10px; font-size: 14px;">📋 Specifications</div>
+                  <div style="font-weight: 600; color: #374151; margin-bottom: 10px; font-size: 14px;">ðŸ“‹ Specifications</div>
                   <div class="specs-grid">
                     ${inverter.powerRating ? `
                     <div class="spec-item">
@@ -688,7 +719,7 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
                 <!-- Dates -->
                 ${inverter.purchaseDate || inverter.installationDate ? `
                 <div style="margin-top: 15px;">
-                  <div style="font-weight: 600; color: #374151; margin-bottom: 10px; font-size: 14px;">📅 Important Dates</div>
+                  <div style="font-weight: 600; color: #374151; margin-bottom: 10px; font-size: 14px;">ðŸ“… Important Dates</div>
                   <div class="specs-grid">
                     ${inverter.purchaseDate ? `
                     <div class="spec-item">
@@ -709,7 +740,7 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
                 <!-- Additional Specifications -->
                 ${inverter.specifications ? `
                 <div style="margin-top: 15px;">
-                  <div style="font-weight: 600; color: #374151; margin-bottom: 10px; font-size: 14px;">📝 Additional Specs</div>
+                  <div style="font-weight: 600; color: #374151; margin-bottom: 10px; font-size: 14px;">ðŸ“ Additional Specs</div>
                   <div class="info-item">
                     <div class="value" style="white-space: pre-line;">${inverter.specifications}</div>
                   </div>
@@ -721,28 +752,28 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
               <!-- Service Staff -->
               <div class="section">
                 <div class="section-title">
-                  <span>👥</span> Service Staff
+                  <span>ðŸ‘¥</span> Service Staff
                 </div>
                 <div class="grid">
                   <div class="info-item">
-                    <div class="label">👤 Assigned To</div>
+                    <div class="label">ðŸ‘¤ Assigned To</div>
                     <div class="value">${staffName || 'Not Assigned'}</div>
                   </div>
                   ${staffRole ? `
                   <div class="info-item">
-                    <div class="label">📋 Role</div>
+                    <div class="label">ðŸ“‹ Role</div>
                     <div class="value">${staffRole}</div>
                   </div>
                   ` : ''}
                   ${staffEmail ? `
                   <div class="info-item">
-                    <div class="label">✉️ Email</div>
+                    <div class="label">âœ‰ï¸ Email</div>
                     <div class="value">${staffEmail}</div>
                   </div>
                   ` : ''}
                   ${staffPhone ? `
                   <div class="info-item">
-                    <div class="label">📞 Phone</div>
+                    <div class="label">ðŸ“ž Phone</div>
                     <div class="value">${staffPhone}</div>
                   </div>
                   ` : ''}
@@ -752,7 +783,7 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
               <!-- Warranty & AMC -->
               <div class="section">
                 <div class="section-title">
-                  <span>🛡️</span> Warranty & AMC
+                  <span>ðŸ›¡ï¸</span> Warranty & AMC
                 </div>
                 <div class="grid">
                   <div class="info-item">
@@ -772,7 +803,7 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
               ${formatCurrency(service.final_cost || service.estimated_cost) ? `
               <div class="section">
                 <div class="section-title">
-                  <span>💰</span> Financial Details
+                  <span>ðŸ’°</span> Financial Details
                 </div>
                 <div class="info-item">
                   <div class="label">Service Cost</div>
@@ -786,7 +817,7 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
               <!-- Dates -->
               <div class="section">
                 <div class="section-title">
-                  <span>📅</span> Dates
+                  <span>ðŸ“…</span> Dates
                 </div>
                 <div class="grid">
                   <div class="info-item">
@@ -806,7 +837,7 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
               ${service.issue_description ? `
               <div class="section">
                 <div class="section-title">
-                  <span>⚠️</span> Issue Description
+                  <span>âš ï¸</span> Issue Description
                 </div>
                 <div class="info-item">
                   <div class="value" style="white-space: pre-line;">${service.issue_description}</div>
@@ -818,7 +849,7 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
               ${service.notes ? `
               <div class="section">
                 <div class="section-title">
-                  <span>📝</span> Additional Notes
+                  <span>ðŸ“</span> Additional Notes
                 </div>
                 <div class="info-item">
                   <div class="value" style="white-space: pre-line;">${service.notes}</div>
@@ -865,12 +896,6 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
   // Get staff information
   const { staffName, staffEmail, staffPhone, staffRole } = getStaffInfo();
   
-  // Get inverter information
-  const inverter = getInverterInfo();
-  
-  // Get battery information
-  const battery = getBatteryInfo();
-
   // Get status badge color
   const getStatusBadgeColor = (status?: string) => {
     switch(status?.toLowerCase()) {
@@ -883,6 +908,8 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
   };
 
   const statusBadge = getStatusBadgeColor(service.status);
+  const batteryList = getBatteryList();
+  const inverterList = getInverterList();
 
   return (
     <motion.div 
@@ -926,7 +953,7 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
         transition={{ type: "spring", damping: 30, stiffness: 300 }}
         onClick={(e) => e.stopPropagation()}
         style={{
-          maxWidth: isMobile ? '100%' : isTablet ? '800px' : '1000px',
+          maxWidth: isMobile ? '100%' : isTablet ? '920px' : '1240px',
           width: '100%',
           maxHeight: isMobile ? '95vh' : '90vh',
           overflowY: 'auto',
@@ -1002,6 +1029,26 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
                 }}>
                   {service.status?.replace(/_/g, ' ').toUpperCase() || 'PENDING'}
                 </span>
+                <span style={{
+                  padding: '6px 12px',
+                  backgroundColor: 'rgba(16,185,129,0.2)',
+                  borderRadius: '30px',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  border: '1px solid rgba(255,255,255,0.2)'
+                }}>
+                  B: {batteryList.length}
+                </span>
+                <span style={{
+                  padding: '6px 12px',
+                  backgroundColor: 'rgba(251,146,60,0.2)',
+                  borderRadius: '30px',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  border: '1px solid rgba(255,255,255,0.2)'
+                }}>
+                  I: {inverterList.length}
+                </span>
               </div>
               <span style={{ 
                 display: 'flex',
@@ -1071,14 +1118,15 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
         
         {/* Content - Timeline and Documents tabs removed */}
         <div style={{ 
-          padding: isMobile ? '20px' : '28px',
-          backgroundColor: '#f9fafb'
+          padding: isMobile ? '16px' : '22px',
+          background: 'linear-gradient(180deg, #f8fafc 0%, #f3f4f6 100%)'
         }}>
           {/* Main Content Grid */}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: isMobile ? '1fr' : isTablet ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)',
-            gap: isMobile ? '16px' : '24px'
+            gridTemplateColumns: isMobile ? '1fr' : isTablet ? 'repeat(2, minmax(0, 1fr))' : 'minmax(300px, 0.9fr) minmax(430px, 1.25fr) minmax(300px, 0.9fr)',
+            alignItems: 'start',
+            gap: isMobile ? '14px' : '18px'
           }}>
             {/* Customer Information */}
             <motion.div 
@@ -1192,8 +1240,8 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
               </div>
             </motion.div>
             
-            {/* Battery Information */}
-            {battery.model && (
+                        {/* Battery Information */}
+            {batteryList.length > 0 && (
               <motion.div 
                 className="detail-section"
                 initial={{ opacity: 0, y: 20 }}
@@ -1229,105 +1277,28 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
                   }}>
                     <FiBattery size={18} />
                   </span>
-                  Battery Information
+                  Battery Information ({batteryList.length})
                 </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  {battery.code && (
-                    <div>
-                      <div style={{ color: '#6b7280', fontSize: '13px', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <FiHash size={12} /> Battery Code
-                      </div>
-                      <div style={{ 
-                        background: '#f9fafb',
-                        padding: '10px 14px',
-                        borderRadius: '12px',
-                        border: '1px solid #f3f4f6',
-                        fontFamily: 'monospace',
-                        fontSize: isMobile ? '14px' : '15px',
-                        fontWeight: '500',
-                        color: '#111827'
-                      }}>
-                        {battery.code}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {batteryList.map((item: any, index: number) => (
+                    <div key={`battery-${item?.id || index}`} style={{ background: '#f8fafc', border: '1px solid #e5e7eb', borderLeft: '4px solid #16a34a', borderRadius: '12px', padding: '12px' }}>
+                      <div style={{ fontWeight: 600, color: '#111827', marginBottom: '8px' }}>Battery {index + 1}</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '8px' }}>
+                        <div><span style={{ color: '#6b7280', fontSize: '12px' }}>Model:</span> {item?.battery_model || '-'}</div>
+                        <div><span style={{ color: '#6b7280', fontSize: '12px' }}>Serial:</span> {item?.battery_serial || '-'}</div>
+                        <div><span style={{ color: '#6b7280', fontSize: '12px' }}>Brand:</span> {item?.brand || '-'}</div>
+                        <div><span style={{ color: '#6b7280', fontSize: '12px' }}>Capacity:</span> {item?.capacity || '-'}</div>
+                        <div><span style={{ color: '#6b7280', fontSize: '12px' }}>Type:</span> {item?.battery_type ? String(item.battery_type).replace(/_/g, ' ') : '-'}</div>
+                        <div><span style={{ color: '#6b7280', fontSize: '12px' }}>Voltage:</span> {item?.voltage || '-'}</div>
                       </div>
                     </div>
-                  )}
-                  
-                  <div>
-                    <div style={{ color: '#6b7280', fontSize: '13px', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <FiPackage size={12} /> Model
-                    </div>
-                    <div style={{ 
-                      background: '#f9fafb',
-                      padding: '10px 14px',
-                      borderRadius: '12px',
-                      border: '1px solid #f3f4f6',
-                      fontSize: isMobile ? '15px' : '16px',
-                      fontWeight: '500',
-                      color: '#111827'
-                    }}>
-                      {battery.model}
-                    </div>
-                  </div>
-                  
-                  {battery.serial && (
-                    <div>
-                      <div style={{ color: '#6b7280', fontSize: '13px', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <FiTag size={12} /> Serial Number
-                      </div>
-                      <div style={{ 
-                        background: '#f9fafb',
-                        padding: '10px 14px',
-                        borderRadius: '12px',
-                        border: '1px solid #f3f4f6',
-                        fontFamily: 'monospace',
-                        fontSize: isMobile ? '14px' : '15px'
-                      }}>
-                        {battery.serial}
-                      </div>
-                    </div>
-                  )}
-                  
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    {battery.brand && (
-                      <div>
-                        <div style={{ color: '#6b7280', fontSize: '12px', marginBottom: '4px' }}>Brand</div>
-                        <div style={{ fontWeight: '500', color: '#111827' }}>{battery.brand}</div>
-                      </div>
-                    )}
-                    {battery.capacity && (
-                      <div>
-                        <div style={{ color: '#6b7280', fontSize: '12px', marginBottom: '4px' }}>Capacity</div>
-                        <div style={{ fontWeight: '500', color: '#111827' }}>{battery.capacity}</div>
-                      </div>
-                    )}
-                    {battery.type && (
-                      <div>
-                        <div style={{ color: '#6b7280', fontSize: '12px', marginBottom: '4px' }}>Type</div>
-                        <div style={{ 
-                          display: 'inline-block',
-                          padding: '4px 10px',
-                          background: '#f3f4f6',
-                          borderRadius: '20px',
-                          fontSize: '12px',
-                          fontWeight: '500'
-                        }}>
-                          {battery.type.replace(/_/g, ' ')}
-                        </div>
-                      </div>
-                    )}
-                    {battery.voltage && (
-                      <div>
-                        <div style={{ color: '#6b7280', fontSize: '12px', marginBottom: '4px' }}>Voltage</div>
-                        <div style={{ fontWeight: '500', color: '#111827' }}>{battery.voltage}</div>
-                      </div>
-                    )}
-                  </div>
+                  ))}
                 </div>
               </motion.div>
             )}
             
-            {/* Inverter Information - ENHANCED SECTION */}
-            {inverter.model && (
+            {/* Inverter Information */}
+            {inverterList.length > 0 && (
               <motion.div 
                 className="detail-section"
                 initial={{ opacity: 0, y: 20 }}
@@ -1364,275 +1335,25 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
                   }}>
                     <FiPower size={18} />
                   </span>
-                  Inverter Information
+                  Inverter Information ({inverterList.length})
                 </h3>
-                
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                  {/* Basic Info */}
-                  <div>
-                    <div style={{ 
-                      display: 'grid', 
-                      gridTemplateColumns: 'repeat(2, 1fr)', 
-                      gap: '12px',
-                      marginBottom: '16px'
-                    }}>
-                      {inverter.code && (
-                        <div style={{ gridColumn: 'span 2' }}>
-                          <div style={{ color: '#6b7280', fontSize: '12px', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <FiHash size={12} /> Inverter Code
-                          </div>
-                          <div style={{ 
-                            background: '#f9fafb',
-                            padding: '10px 14px',
-                            borderRadius: '12px',
-                            border: '1px solid #f3f4f6',
-                            fontFamily: 'monospace',
-                            fontSize: isMobile ? '14px' : '15px',
-                            fontWeight: '500',
-                            color: '#111827'
-                          }}>
-                            {inverter.code}
-                          </div>
-                        </div>
-                      )}
-                      
-                      <div style={{ gridColumn: 'span 2' }}>
-                        <div style={{ color: '#6b7280', fontSize: '12px', marginBottom: '4px' }}>Model</div>
-                        <div style={{ 
-                          fontSize: isMobile ? '18px' : '20px', 
-                          fontWeight: '700',
-                          color: '#111827',
-                          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                          WebkitBackgroundClip: 'text',
-                          WebkitTextFillColor: 'transparent',
-                          display: 'inline-block'
-                        }}>
-                          {inverter.model}
-                        </div>
-                      </div>
-                      
-                      {inverter.serial && (
-                        <div style={{ gridColumn: 'span 2' }}>
-                          <div style={{ color: '#6b7280', fontSize: '12px', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <FiTag size={12} /> Serial Number
-                          </div>
-                          <div style={{ 
-                            background: '#f9fafb',
-                            padding: '10px 14px',
-                            borderRadius: '12px',
-                            border: '1px solid #f3f4f6',
-                            fontFamily: 'monospace',
-                            fontSize: isMobile ? '14px' : '15px'
-                          }}>
-                            {inverter.serial}
-                          </div>
-                        </div>
-                      )}
-                      
-                      {inverter.brand && (
-                        <div>
-                          <div style={{ color: '#6b7280', fontSize: '12px', marginBottom: '4px' }}>Brand</div>
-                          <div style={{ fontWeight: '600', color: '#111827' }}>{inverter.brand}</div>
-                        </div>
-                      )}
-                      
-                      {inverter.powerRating && (
-                        <div>
-                          <div style={{ color: '#6b7280', fontSize: '12px', marginBottom: '4px' }}>Power Rating</div>
-                          <div style={{ 
-                            background: '#fef3c7',
-                            padding: '6px 12px',
-                            borderRadius: '30px',
-                            display: 'inline-block',
-                            fontWeight: '600',
-                            color: '#92400e'
-                          }}>
-                            {inverter.powerRating}VA
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  
-                  {/* Specifications Grid */}
-                  <div>
-                    <div style={{ 
-                      fontSize: '15px', 
-                      fontWeight: '600', 
-                      color: '#374151', 
-                      marginBottom: '12px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px'
-                    }}>
-                      <FiCpu size={16} color="#8b5cf6" />
-                      Technical Specifications
-                    </div>
-                    
-                    <div style={{ 
-                      display: 'grid', 
-                      gridTemplateColumns: 'repeat(2, 1fr)', 
-                      gap: '12px',
-                      background: '#f9fafb',
-                      padding: '16px',
-                      borderRadius: '16px',
-                      border: '1px solid #f3f4f6'
-                    }}>
-                      {inverter.type && (
-                        <div>
-                          <div style={{ color: '#6b7280', fontSize: '11px', marginBottom: '2px' }}>Type</div>
-                          <div style={{ fontWeight: '500', fontSize: '13px', color: '#111827' }}>{inverter.type}</div>
-                        </div>
-                      )}
-                      
-                      {inverter.waveType && (
-                        <div>
-                          <div style={{ color: '#6b7280', fontSize: '11px', marginBottom: '2px' }}>Wave Type</div>
-                          <div style={{ fontWeight: '500', fontSize: '13px', color: '#111827' }}>
-                            {inverter.waveType.replace(/_/g, ' ')}
-                          </div>
-                        </div>
-                      )}
-                      
-                      {inverter.inputVoltage && (
-                        <div>
-                          <div style={{ color: '#6b7280', fontSize: '11px', marginBottom: '2px' }}>Input Voltage</div>
-                          <div style={{ fontWeight: '500', fontSize: '13px', color: '#111827' }}>{inverter.inputVoltage}</div>
-                        </div>
-                      )}
-                      
-                      {inverter.outputVoltage && (
-                        <div>
-                          <div style={{ color: '#6b7280', fontSize: '11px', marginBottom: '2px' }}>Output Voltage</div>
-                          <div style={{ fontWeight: '500', fontSize: '13px', color: '#111827' }}>{inverter.outputVoltage}</div>
-                        </div>
-                      )}
-                      
-                      {inverter.efficiency && (
-                        <div>
-                          <div style={{ color: '#6b7280', fontSize: '11px', marginBottom: '2px' }}>Efficiency</div>
-                          <div style={{ fontWeight: '500', fontSize: '13px', color: '#111827' }}>{inverter.efficiency}</div>
-                        </div>
-                      )}
-                      
-                      {inverter.batteryVoltage && (
-                        <div>
-                          <div style={{ color: '#6b7280', fontSize: '11px', marginBottom: '2px' }}>Battery Voltage</div>
-                          <div style={{ fontWeight: '500', fontSize: '13px', color: '#111827' }}>{inverter.batteryVoltage}</div>
-                        </div>
-                      )}
-                      
-                      {inverter.warrantyPeriod && (
-                        <div>
-                          <div style={{ color: '#6b7280', fontSize: '11px', marginBottom: '2px' }}>Warranty</div>
-                          <div style={{ fontWeight: '500', fontSize: '13px', color: '#10b981' }}>{inverter.warrantyPeriod}</div>
-                        </div>
-                      )}
-                      
-                      {inverter.condition && (
-                        <div>
-                          <div style={{ color: '#6b7280', fontSize: '11px', marginBottom: '2px' }}>Condition</div>
-                          <div style={{ fontWeight: '500', fontSize: '13px', color: '#111827' }}>{inverter.condition}</div>
-                        </div>
-                      )}
-                      
-                      {inverter.status && (
-                        <div>
-                          <div style={{ color: '#6b7280', fontSize: '11px', marginBottom: '2px' }}>Status</div>
-                          <div style={{ 
-                            color: inverter.status === 'active' ? '#10b981' : '#ef4444',
-                            fontWeight: '500',
-                            fontSize: '13px'
-                          }}>
-                            {inverter.status}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  
-                  {/* Dates */}
-                  {(inverter.purchaseDate || inverter.installationDate) && (
-                    <div>
-                      <div style={{ 
-                        fontSize: '15px', 
-                        fontWeight: '600', 
-                        color: '#374151', 
-                        marginBottom: '12px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px'
-                      }}>
-                        <FiCalendar size={16} color="#8b5cf6" />
-                        Important Dates
-                      </div>
-                      
-                      <div style={{ 
-                        display: 'grid', 
-                        gridTemplateColumns: 'repeat(2, 1fr)', 
-                        gap: '12px'
-                      }}>
-                        {inverter.purchaseDate && (
-                          <div style={{
-                            background: '#f9fafb',
-                            padding: '12px',
-                            borderRadius: '12px',
-                            border: '1px solid #f3f4f6'
-                          }}>
-                            <div style={{ color: '#6b7280', fontSize: '11px', marginBottom: '4px' }}>Purchase Date</div>
-                            <div style={{ fontWeight: '500', fontSize: '13px' }}>{formatDate(inverter.purchaseDate)}</div>
-                          </div>
-                        )}
-                        
-                        {inverter.installationDate && (
-                          <div style={{
-                            background: '#f9fafb',
-                            padding: '12px',
-                            borderRadius: '12px',
-                            border: '1px solid #f3f4f6'
-                          }}>
-                            <div style={{ color: '#6b7280', fontSize: '11px', marginBottom: '4px' }}>Installation Date</div>
-                            <div style={{ fontWeight: '500', fontSize: '13px' }}>{formatDate(inverter.installationDate)}</div>
-                          </div>
-                        )}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {inverterList.map((item: any, index: number) => (
+                    <div key={`inverter-${item?.id || index}`} style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderLeft: '4px solid #ea580c', borderRadius: '12px', padding: '12px' }}>
+                      <div style={{ fontWeight: 600, color: '#111827', marginBottom: '8px' }}>Inverter {index + 1}</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '8px' }}>
+                        <div><span style={{ color: '#6b7280', fontSize: '12px' }}>Model:</span> {item?.inverter_model || '-'}</div>
+                        <div><span style={{ color: '#6b7280', fontSize: '12px' }}>Serial:</span> {item?.inverter_serial || '-'}</div>
+                        <div><span style={{ color: '#6b7280', fontSize: '12px' }}>Brand:</span> {item?.inverter_brand || '-'}</div>
+                        <div><span style={{ color: '#6b7280', fontSize: '12px' }}>Power:</span> {item?.power_rating ? `${item.power_rating}VA` : '-'}</div>
+                        <div><span style={{ color: '#6b7280', fontSize: '12px' }}>Wave Type:</span> {item?.wave_type ? String(item.wave_type).replace(/_/g, ' ') : '-'}</div>
+                        <div><span style={{ color: '#6b7280', fontSize: '12px' }}>Battery Voltage:</span> {item?.battery_voltage || '-'}</div>
                       </div>
                     </div>
-                  )}
-                  
-                  {/* Additional Specifications */}
-                  {inverter.specifications && (
-                    <div>
-                      <div style={{ 
-                        fontSize: '15px', 
-                        fontWeight: '600', 
-                        color: '#374151', 
-                        marginBottom: '12px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px'
-                      }}>
-                        <FiFileText size={16} color="#8b5cf6" />
-                        Additional Specifications
-                      </div>
-                      
-                      <div style={{
-                        background: '#f9fafb',
-                        padding: '16px',
-                        borderRadius: '12px',
-                        border: '1px solid #f3f4f6',
-                        fontSize: '13px',
-                        color: '#4b5563',
-                        lineHeight: '1.6',
-                        whiteSpace: 'pre-line'
-                      }}>
-                        {inverter.specifications}
-                      </div>
-                    </div>
-                  )}
+                  ))}
                 </div>
               </motion.div>
             )}
-            
             {/* Service Staff Information */}
             <motion.div 
               className="detail-section"
@@ -2148,9 +1869,7 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
                 {service.notes}
               </div>
             </motion.div>
-          )}
-          
-          {/* Action Buttons */}
+          )}          {/* Action Buttons */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -2287,12 +2006,14 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
         
         /* Animations */
         .detail-section {
-          transition: all 0.3s ease;
+          transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+          will-change: transform;
         }
         
         .detail-section:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1) !important;
+          transform: translateY(-3px);
+          border-color: #e2e8f0 !important;
+          box-shadow: 0 14px 24px -14px rgba(15, 23, 42, 0.35) !important;
         }
         
         /* Print styles */
@@ -2315,3 +2036,6 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
 };
 
 export default ServiceDetailModal;
+
+
+

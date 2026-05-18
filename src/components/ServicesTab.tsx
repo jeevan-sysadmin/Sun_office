@@ -395,8 +395,24 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
   // Print single receipt
   const printReceipt = (service: ServiceOrder) => {
     try {
-      const equipment = service.battery_model || service.inverter_model || 'N/A';
-      const equipmentSerial = service.battery_serial || service.inverter_serial || 'N/A';
+      const batteries = Array.isArray((service as any).batteries) ? (service as any).batteries : [];
+      const inverters = Array.isArray((service as any).inverters) ? (service as any).inverters : [];
+      const batteryList = batteries.length > 0 ? batteries : [{
+        battery_model: service.battery_model || '',
+        battery_serial: service.battery_serial || '',
+        brand: service.battery_brand || '',
+        capacity: service.battery_capacity || '',
+        voltage: service.battery_voltage || '',
+        battery_type: service.battery_type || ''
+      }];
+      const inverterList = inverters.length > 0 ? inverters : [{
+        inverter_model: service.inverter_model || '',
+        inverter_serial: service.inverter_serial || '',
+        inverter_brand: (service as any).inverter_brand || '',
+        power_rating: (service as any).inverter_power_rating || '',
+        wave_type: (service as any).inverter_wave_type || '',
+        battery_voltage: (service as any).inverter_battery_voltage || ''
+      }];
       const amountSource = service.final_cost || service.estimated_cost;
       const amountNumber = amountSource ? Number(amountSource) : NaN;
       const amountValue =
@@ -425,8 +441,8 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
           title: "Service Details",
           fields: [
             { label: "Service Type", value: formatReceiptLabel(service.service_type) || "General Service" },
-            { label: "Equipment", value: equipment },
-            { label: "Serial Number", value: equipmentSerial === 'N/A' ? null : equipmentSerial },
+            { label: "Batteries", value: batteryList.map((b: any, i: number) => `${i + 1}. ${b?.battery_model || '-'} (${b?.battery_serial || '-'})`).join('\n'), wide: true, multiline: true },
+            { label: "Inverters", value: inverterList.map((inv: any, i: number) => `${i + 1}. ${inv?.inverter_model || '-'} (${inv?.inverter_serial || '-'})`).join('\n'), wide: true, multiline: true },
             { label: "Created On", value: formatDate(service.created_at) },
             {
               label: "Issue Description",
@@ -539,26 +555,66 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
           <table>
             <thead>
               <tr>
+                <th>ID</th>
                 <th>Service Code</th>
                 <th>Customer</th>
+                <th>Email</th>
+                <th>Address</th>
                 <th>Phone</th>
-                <th>Equipment</th>
-                <th>Serial Number</th>
-                <th>Date</th>
+                <th>Battery IDs</th>
+                <th>Batteries</th>
+                <th>Inverter IDs</th>
+                <th>Inverters</th>
+                <th>Status</th>
+                <th>Priority</th>
+                <th>Payment</th>
+                <th>Estimated Cost</th>
+                <th>Final Cost</th>
+                <th>Deposit</th>
+                <th>Warranty</th>
+                <th>AMC</th>
+                <th>Issue</th>
+                <th>Notes</th>
+                <th>Created</th>
+                <th>Updated</th>
               </tr>
             </thead>
             <tbody>
               ${dataToPrint.map(service => {
-                const equipment = service.battery_model || service.inverter_model || 'N/A';
-                const serialNumber = service.battery_serial || service.inverter_serial || 'N/A';
+                const batteries = Array.isArray((service as any).batteries) ? (service as any).batteries : [];
+                const inverters = Array.isArray((service as any).inverters) ? (service as any).inverters : [];
+                const batteryIds = Array.isArray((service as any).battery_ids) ? (service as any).battery_ids.join(', ') : '';
+                const inverterIds = Array.isArray((service as any).inverter_ids) ? (service as any).inverter_ids.join(', ') : '';
+                const batteryText = batteries.length > 0
+                  ? batteries.map((b: any) => `${b?.battery_model || '-'} (${b?.battery_serial || '-'})`).join('<br/>')
+                  : ((service.battery_model || '') ? `${service.battery_model} (${service.battery_serial || '-'})` : '-');
+                const inverterText = inverters.length > 0
+                  ? inverters.map((i: any) => `${i?.inverter_model || '-'} (${i?.inverter_serial || '-'})`).join('<br/>')
+                  : ((service.inverter_model || '') ? `${service.inverter_model} (${service.inverter_serial || '-'})` : '-');
                 return `
                   <tr>
+                    <td>${service.id || ''}</td>
                     <td>${service.service_code || ''}</td>
                     <td>${service.customer_name || ''}</td>
+                    <td>${(service as any).customer_email || ''}</td>
+                    <td>${(service as any).customer_address || ''}</td>
                     <td>${service.customer_phone || ''}</td>
-                    <td>${equipment}</td>
-                    <td>${serialNumber}</td>
+                    <td>${batteryIds || '-'}</td>
+                    <td>${batteryText}</td>
+                    <td>${inverterIds || '-'}</td>
+                    <td>${inverterText}</td>
+                    <td>${formatReceiptLabel((service as any).status) || 'Pending'}</td>
+                    <td>${formatReceiptLabel((service as any).priority) || ''}</td>
+                    <td>${formatReceiptLabel((service as any).payment_status) || ''}</td>
+                    <td>${(service as any).estimated_cost || ''}</td>
+                    <td>${(service as any).final_cost || ''}</td>
+                    <td>${(service as any).deposit_amount || ''}</td>
+                    <td>${formatReceiptLabel((service as any).warranty_status) || ''}</td>
+                    <td>${formatReceiptLabel((service as any).amc_status) || ''}</td>
+                    <td>${(service as any).issue_description || ''}</td>
+                    <td>${service.notes || ''}</td>
                     <td>${formatDate(service.created_at)}</td>
+                    <td>${formatDate((service as any).updated_at || '')}</td>
                   </tr>
                 `;
               }).join('')}
@@ -595,33 +651,154 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
       let csvContent = "";
       
       const headers = [
+        'ID',
         'Service Code',
+        'Customer ID',
         'Customer Name',
+        'Customer Email',
+        'Customer Address',
         'Customer Phone',
-        'Battery Model',
-        'Battery Serial',
-        'Inverter Model',
-        'Inverter Serial',
+        'Battery Count',
+        'Battery Names',
+        'Battery Models (All)',
+        'Battery Serials (All)',
+        'Battery Brands (All)',
+        'Battery Capacities (All)',
+        'Battery Voltages (All)',
+        'Battery Types (All)',
+        'Battery Details (All)',
+        'Inverter Count',
+        'Inverter Names',
+        'Inverter Models (All)',
+        'Inverter Serials (All)',
+        'Inverter Brands (All)',
+        'Inverter Power Ratings (All)',
+        'Inverter Wave Types (All)',
+        'Inverter Battery Voltages (All)',
+        'Inverter Details (All)',
+        'Service Staff ID',
+        'Staff Name',
+        'Staff Email',
+        'Status',
+        'Priority',
+        'Payment Status',
+        'Estimated Cost',
+        'Final Cost',
+        'Deposit Amount',
         'Created Date',
+        'Updated Date',
         'Warranty Status',
         'AMC Status',
+        'Issue Description',
         'Notes'
       ];
       
       csvContent += headers.join(',') + '\n';
       
       dataToExport.forEach(service => {
+        const batteries = Array.isArray((service as any).batteries) ? (service as any).batteries : [];
+        const inverters = Array.isArray((service as any).inverters) ? (service as any).inverters : [];
+
+        const batteryFallback = (service.battery_model || service.battery_serial || (service as any).battery_brand)
+          ? [{
+              battery_model: service.battery_model || '',
+              battery_serial: service.battery_serial || '',
+              brand: (service as any).battery_brand || '',
+              capacity: (service as any).battery_capacity || '',
+              voltage: (service as any).battery_voltage || '',
+              battery_type: (service as any).battery_type || ''
+            }]
+          : [];
+        const inverterFallback = (service.inverter_model || service.inverter_serial || (service as any).inverter_brand)
+          ? [{
+              inverter_model: service.inverter_model || '',
+              inverter_serial: service.inverter_serial || '',
+              inverter_brand: (service as any).inverter_brand || '',
+              power_rating: (service as any).inverter_power_rating || '',
+              wave_type: (service as any).inverter_wave_type || '',
+              battery_voltage: (service as any).inverter_battery_voltage || ''
+            }]
+          : [];
+
+        const allBatteries = batteries.length > 0 ? batteries : batteryFallback;
+        const allInverters = inverters.length > 0 ? inverters : inverterFallback;
+
+        const batteryModels = allBatteries.map((b: any) => b?.battery_model || '').filter(Boolean).join(' | ');
+        const batterySerials = allBatteries.map((b: any) => b?.battery_serial || '').filter(Boolean).join(' | ');
+        const batteryBrands = allBatteries.map((b: any) => b?.brand || '').filter(Boolean).join(' | ');
+        const batteryCapacities = allBatteries.map((b: any) => b?.capacity || '').filter(Boolean).join(' | ');
+        const batteryVoltages = allBatteries.map((b: any) => b?.voltage || '').filter(Boolean).join(' | ');
+        const batteryTypes = allBatteries.map((b: any) => b?.battery_type || '').filter(Boolean).join(' | ');
+        const batteryDetails = allBatteries
+          .map((b: any, i: number) => {
+            const model = b?.battery_model || '-';
+            const serial = b?.battery_serial || '-';
+            const brand = b?.brand || '-';
+            const capacity = b?.capacity || '-';
+            const voltage = b?.voltage || '-';
+            const typeName = b?.battery_type || '-';
+            return `${i + 1}) ${model}; Serial=${serial}; Brand=${brand}; Capacity=${capacity}; Voltage=${voltage}; Type=${typeName}`;
+          })
+          .join(' || ');
+
+        const inverterModels = allInverters.map((inv: any) => inv?.inverter_model || '').filter(Boolean).join(' | ');
+        const inverterSerials = allInverters.map((inv: any) => inv?.inverter_serial || '').filter(Boolean).join(' | ');
+        const inverterBrands = allInverters.map((inv: any) => inv?.inverter_brand || '').filter(Boolean).join(' | ');
+        const inverterPowers = allInverters.map((inv: any) => inv?.power_rating || '').filter(Boolean).join(' | ');
+        const inverterWaves = allInverters.map((inv: any) => inv?.wave_type || '').filter(Boolean).join(' | ');
+        const inverterBattVoltages = allInverters.map((inv: any) => inv?.battery_voltage || '').filter(Boolean).join(' | ');
+        const inverterDetails = allInverters
+          .map((inv: any, i: number) => {
+            const model = inv?.inverter_model || '-';
+            const serial = inv?.inverter_serial || '-';
+            const brand = inv?.inverter_brand || '-';
+            const power = inv?.power_rating || '-';
+            const wave = inv?.wave_type || '-';
+            const battV = inv?.battery_voltage || '-';
+            return `${i + 1}) ${model}; Serial=${serial}; Brand=${brand}; Power=${power}; Wave=${wave}; BatteryVoltage=${battV}`;
+          })
+          .join(' || ');
+
         const row = [
+          `"${String(service.id || '')}"`,
           `"${(service.service_code || '').replace(/"/g, '""')}"`,
+          `"${String(service.customer_id || '')}"`,
           `"${(service.customer_name || '').replace(/"/g, '""')}"`,
+          `"${((service as any).customer_email || '').replace(/"/g, '""')}"`,
+          `"${((service as any).customer_address || '').replace(/"/g, '""')}"`,
           `"${(service.customer_phone || '').replace(/"/g, '""')}"`,
-          `"${(service.battery_model || '').replace(/"/g, '""')}"`,
-          `"${(service.battery_serial || '').replace(/"/g, '""')}"`,
-          `"${(service.inverter_model || '').replace(/"/g, '""')}"`,
-          `"${(service.inverter_serial || '').replace(/"/g, '""')}"`,
+          `"${String(allBatteries.length)}"`,
+          `"${batteryModels.replace(/"/g, '""')}"`,
+          `"${batteryModels.replace(/"/g, '""')}"`,
+          `"${batterySerials.replace(/"/g, '""')}"`,
+          `"${batteryBrands.replace(/"/g, '""')}"`,
+          `"${batteryCapacities.replace(/"/g, '""')}"`,
+          `"${batteryVoltages.replace(/"/g, '""')}"`,
+          `"${batteryTypes.replace(/"/g, '""')}"`,
+          `"${batteryDetails.replace(/"/g, '""')}"`,
+          `"${String(allInverters.length)}"`,
+          `"${inverterModels.replace(/"/g, '""')}"`,
+          `"${inverterModels.replace(/"/g, '""')}"`,
+          `"${inverterSerials.replace(/"/g, '""')}"`,
+          `"${inverterBrands.replace(/"/g, '""')}"`,
+          `"${inverterPowers.replace(/"/g, '""')}"`,
+          `"${inverterWaves.replace(/"/g, '""')}"`,
+          `"${inverterBattVoltages.replace(/"/g, '""')}"`,
+          `"${inverterDetails.replace(/"/g, '""')}"`,
+          `"${String((service as any).service_staff_id || '')}"`,
+          `"${((service as any).staff_name || '').replace(/"/g, '""')}"`,
+          `"${((service as any).staff_email || '').replace(/"/g, '""')}"`,
+          `"${((service as any).status || '').replace(/"/g, '""')}"`,
+          `"${((service as any).priority || '').replace(/"/g, '""')}"`,
+          `"${((service as any).payment_status || '').replace(/"/g, '""')}"`,
+          `"${((service as any).estimated_cost || '').replace(/"/g, '""')}"`,
+          `"${((service as any).final_cost || '').replace(/"/g, '""')}"`,
+          `"${((service as any).deposit_amount || '').replace(/"/g, '""')}"`,
           `"${formatDate(service.created_at)}"`,
+          `"${formatDate((service as any).updated_at || '')}"`,
           `"${(service.warranty_status || '').replace(/"/g, '""')}"`,
           `"${(service.amc_status || '').replace(/"/g, '""')}"`,
+          `"${((service as any).issue_description || '').replace(/"/g, '""')}"`,
           `"${(service.notes || '').replace(/"/g, '""')}"`
         ];
         csvContent += row.join(',') + '\n';
@@ -719,29 +896,32 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
       yPos += 5;
       doc.text(`Generated: ${new Date().toLocaleString()}`, 14, yPos);
 
-      const tableColumn = isMobile 
-        ? ['Code', 'Customer', 'Equipment', 'Serial', 'Date']
-        : ['Service Code', 'Customer', 'Phone', 'Equipment', 'Serial Number', 'Date'];
+      const tableColumn = [
+        'Service Code',
+        'Customer',
+        'Phone',
+        'Batteries',
+        'Inverters',
+        'Status',
+        'Created',
+      ];
 
       const tableRows = dataToExport.map(service => {
-        const equipment = service.battery_model || service.inverter_model || 'N/A';
-        const serialNumber = service.battery_serial || service.inverter_serial || 'N/A';
-        
-        if (isMobile) {
-          return [
-            service.service_code || '',
-            service.customer_name || '',
-            equipment,
-            serialNumber,
-            formatDate(service.created_at)
-          ];
-        }
+        const batteries = Array.isArray((service as any).batteries) ? (service as any).batteries : [];
+        const inverters = Array.isArray((service as any).inverters) ? (service as any).inverters : [];
+        const batteryText = batteries.length > 0
+          ? batteries.map((b: any) => `${b?.battery_model || '-'} (${b?.battery_serial || '-'})`).join('\n')
+          : ((service.battery_model || '') ? `${service.battery_model} (${service.battery_serial || '-'})` : '-');
+        const inverterText = inverters.length > 0
+          ? inverters.map((i: any) => `${i?.inverter_model || '-'} (${i?.inverter_serial || '-'})`).join('\n')
+          : ((service.inverter_model || '') ? `${service.inverter_model} (${service.inverter_serial || '-'})` : '-');
         return [
           service.service_code || '',
           service.customer_name || '',
           service.customer_phone || '',
-          equipment,
-          serialNumber,
+          batteryText,
+          inverterText,
+          formatReceiptLabel((service as any).status) || 'Pending',
           formatDate(service.created_at)
         ];
       });
@@ -752,7 +932,7 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
         startY: 50,
         theme: 'grid',
         styles: {
-          fontSize: isMobile ? 7 : 10,
+          fontSize: isMobile ? 7 : 8.5,
           cellPadding: isMobile ? 2 : 3,
           lineColor: [200, 200, 200],
           lineWidth: 0.1,
@@ -764,22 +944,15 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
           fontStyle: 'bold',
           halign: 'center'
         },
-        columnStyles: isMobile 
-          ? {
-              0: { cellWidth: 30 },
-              1: { cellWidth: 40 },
-              2: { cellWidth: 40 },
-              3: { cellWidth: 40 },
-              4: { cellWidth: 30 }
-            }
-          : {
-              0: { cellWidth: 35 },
-              1: { cellWidth: 45 },
-              2: { cellWidth: 30 },
-              3: { cellWidth: 40 },
-              4: { cellWidth: 40 },
-              5: { cellWidth: 35 }
-            },
+        columnStyles: {
+          0: { cellWidth: 28 },
+          1: { cellWidth: 30 },
+          2: { cellWidth: 24 },
+          3: { cellWidth: 62 },
+          4: { cellWidth: 62 },
+          5: { cellWidth: 22 },
+          6: { cellWidth: 30 }
+        },
         didDrawPage: () => {
           const pageCount = doc.getNumberOfPages();
           for (let i = 1; i <= pageCount; i++) {
@@ -860,33 +1033,92 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
     exportToPDF(dataToExport, 'selected');
   };
 
-  // Determine equipment type
-  const getEquipmentType = (service: ServiceOrder) => {
-    if (service.battery_model) return 'battery';
-    if (service.inverter_model) return 'inverter';
-    return 'unknown';
+  const getEquipmentItems = (service: ServiceOrder) => {
+    const batteries = Array.isArray((service as any).batteries) ? (service as any).batteries : [];
+    const inverters = Array.isArray((service as any).inverters) ? (service as any).inverters : [];
+
+    const batteryItems = batteries.map((b: any) => ({
+      type: 'battery' as const,
+      model: b?.battery_model || 'Battery',
+      serial: b?.battery_serial || ''
+    }));
+    const inverterItems = inverters.map((i: any) => ({
+      type: 'inverter' as const,
+      model: i?.inverter_model || 'Inverter',
+      serial: i?.inverter_serial || ''
+    }));
+
+    const combined = [...batteryItems, ...inverterItems];
+    if (combined.length > 0) return combined;
+
+    const fallback: Array<{ type: 'battery' | 'inverter'; model: string; serial: string }> = [];
+    if (service.battery_model) {
+      fallback.push({ type: 'battery', model: service.battery_model, serial: service.battery_serial || '' });
+    }
+    if (service.inverter_model) {
+      fallback.push({ type: 'inverter', model: service.inverter_model, serial: service.inverter_serial || '' });
+    }
+    return fallback;
   };
 
-  // Get equipment model
   const getEquipmentModel = (service: ServiceOrder) => {
-    const type = getEquipmentType(service);
-    if (type === 'battery') return service.battery_model;
-    if (type === 'inverter') return service.inverter_model;
-    return 'No equipment';
+    const batteries = Array.isArray((service as any).batteries) ? (service as any).batteries : [];
+    const inverters = Array.isArray((service as any).inverters) ? (service as any).inverters : [];
+
+    const batteryNames = batteries.map((b: any) => b?.battery_model).filter(Boolean);
+    const inverterNames = inverters.map((i: any) => i?.inverter_model).filter(Boolean);
+
+    const parts: string[] = [];
+    if (batteryNames.length > 0) parts.push(`Batteries: ${batteryNames.join(', ')}`);
+    if (inverterNames.length > 0) parts.push(`Inverters: ${inverterNames.join(', ')}`);
+
+    if (parts.length > 0) return parts.join(' | ');
+
+    const fallbackParts: string[] = [];
+    if (service.battery_model) fallbackParts.push(`Batteries: ${service.battery_model}`);
+    if (service.inverter_model) fallbackParts.push(`Inverters: ${service.inverter_model}`);
+    return fallbackParts.length > 0 ? fallbackParts.join(' | ') : 'No equipment';
   };
 
-  // Get equipment serial
   const getEquipmentSerial = (service: ServiceOrder) => {
-    const type = getEquipmentType(service);
-    if (type === 'battery') return service.battery_serial;
-    if (type === 'inverter') return service.inverter_serial;
-    return '';
+    const batteries = Array.isArray((service as any).batteries) ? (service as any).batteries : [];
+    const inverters = Array.isArray((service as any).inverters) ? (service as any).inverters : [];
+
+    const batterySerials = batteries.map((b: any) => b?.battery_serial).filter(Boolean);
+    const inverterSerials = inverters.map((i: any) => i?.inverter_serial).filter(Boolean);
+
+    const parts: string[] = [];
+    if (batterySerials.length > 0) parts.push(`B: ${batterySerials.join(', ')}`);
+    if (inverterSerials.length > 0) parts.push(`I: ${inverterSerials.join(', ')}`);
+
+    if (parts.length > 0) return parts.join(' | ');
+
+    const fallback: string[] = [];
+    if (service.battery_serial) fallback.push(`B: ${service.battery_serial}`);
+    if (service.inverter_serial) fallback.push(`I: ${service.inverter_serial}`);
+    return fallback.join(' | ');
   };
 
-  // Get equipment icon
   const getEquipmentIcon = (service: ServiceOrder) => {
-    const type = getEquipmentType(service);
-    return type === 'inverter' ? <FiPower /> : <FiBattery />;
+    const items = getEquipmentItems(service);
+    const hasBattery = items.some((x) => x.type === 'battery');
+    const hasInverter = items.some((x) => x.type === 'inverter');
+    if (hasBattery && hasInverter) return <FiShoppingBag />;
+    if (hasInverter) return <FiPower />;
+    return <FiBattery />;
+  };
+
+  const getEquipmentColor = (service: ServiceOrder) => {
+    const items = getEquipmentItems(service);
+    const hasBattery = items.some((x) => x.type === 'battery');
+    const hasInverter = items.some((x) => x.type === 'inverter');
+    if (hasBattery && hasInverter) {
+      return { backgroundColor: '#eef2ff', color: '#4338ca' };
+    }
+    if (hasInverter) {
+      return { backgroundColor: '#f0f9ff', color: '#0369a1' };
+    }
+    return { backgroundColor: '#fef3c7', color: '#92400e' };
   };
 
   // Render mobile card view
@@ -984,8 +1216,8 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
               width: '24px',
               height: '24px',
               borderRadius: '6px',
-              backgroundColor: getEquipmentType(service) === 'inverter' ? '#f0f9ff' : '#fef3c7',
-              color: getEquipmentType(service) === 'inverter' ? '#0369a1' : '#92400e',
+              backgroundColor: getEquipmentColor(service).backgroundColor,
+              color: getEquipmentColor(service).color,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -1933,8 +2165,8 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
                             width: isTablet ? '32px' : '36px',
                             height: isTablet ? '32px' : '36px',
                             borderRadius: '8px',
-                            backgroundColor: getEquipmentType(service) === 'inverter' ? '#f0f9ff' : '#fef3c7',
-                            color: getEquipmentType(service) === 'inverter' ? '#0369a1' : '#92400e',
+                            backgroundColor: getEquipmentColor(service).backgroundColor,
+                            color: getEquipmentColor(service).color,
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',

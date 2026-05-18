@@ -574,7 +574,9 @@ interface ServiceForm {
   customer_id: number | null;
   customer_phone: string;
   battery_id: number | null;
+  battery_ids?: number[];
   inverter_id?: number | null;
+  inverter_ids?: number[];
   service_staff_id: number | null;
   issue_description: string;
   warranty_status: string;
@@ -647,6 +649,303 @@ const getInverterLabel = (inverter: Inverter): string => {
 // Helper function to get staff label
 const getStaffLabel = (staff: any): string => {
   return `${staff.name}${staff.role ? ` (${staff.role})` : ''}`;
+};
+
+interface MultiSelectDropdownProps {
+  id: string;
+  name: string;
+  values: number[];
+  onChange: (values: number[]) => void;
+  options: any[];
+  optionLabel: (option: any) => string;
+  optionValue: (option: any) => number;
+  placeholder: string;
+  label: string;
+  icon: React.ReactNode;
+  disabled?: boolean;
+  loading?: boolean;
+  hint?: string;
+  isMobile: boolean;
+}
+
+const MultiSelectDropdown: React.FC<MultiSelectDropdownProps> = ({
+  id,
+  name,
+  values,
+  onChange,
+  options,
+  optionLabel,
+  optionValue,
+  placeholder,
+  label,
+  icon,
+  disabled = false,
+  loading = false,
+  hint,
+  isMobile
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen && searchRef.current) searchRef.current.focus();
+  }, [isOpen]);
+
+  const selectedCount = values.length;
+  const selectedOptions = options.filter((option) => values.includes(optionValue(option)));
+  const filteredOptions = options.filter((option) =>
+    optionLabel(option).toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const toggleValue = (id: number) => {
+    if (values.includes(id)) {
+      onChange(values.filter((v) => v !== id));
+    } else {
+      onChange([...values, id]);
+    }
+  };
+
+  const selectAllFiltered = () => {
+    const filteredIds = filteredOptions.map((opt) => optionValue(opt));
+    const merged = Array.from(new Set([...values, ...filteredIds]));
+    onChange(merged);
+  };
+
+  const clearAll = () => onChange([]);
+  const removeOne = (id: number) => onChange(values.filter((v) => v !== id));
+
+  return (
+    <div className="form-group" style={{ marginBottom: '20px' }} ref={dropdownRef}>
+      <label htmlFor={id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', fontWeight: '600', color: '#374151' }}>
+        {icon} {label}
+      </label>
+
+      <button
+        id={id}
+        type="button"
+        aria-expanded={isOpen}
+        aria-haspopup="listbox"
+        disabled={disabled || loading}
+        onClick={() => setIsOpen((prev) => !prev)}
+        style={{
+          width: '100%',
+          minHeight: isMobile ? '48px' : '50px',
+          border: isOpen ? '1px solid #2563eb' : '1px solid #d1d5db',
+          borderRadius: '12px',
+          background: '#fff',
+          padding: selectedCount > 0 ? '8px 12px' : '0 12px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          cursor: disabled || loading ? 'not-allowed' : 'pointer',
+          boxShadow: isOpen ? '0 0 0 3px rgba(37,99,235,0.12)' : 'none',
+          transition: 'all 0.2s ease'
+        }}
+      >
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px', flex: 1 }}>
+          {selectedCount === 0 && (
+            <span style={{ color: '#6b7280', fontSize: '14px' }}>{placeholder}</span>
+          )}
+          {selectedCount > 0 && (
+            <>
+              {selectedOptions.slice(0, 2).map((opt) => (
+                <span
+                  key={optionValue(opt)}
+                  style={{
+                    background: '#eff6ff',
+                    color: '#1d4ed8',
+                    border: '1px solid #bfdbfe',
+                    borderRadius: '999px',
+                    padding: '4px 8px',
+                    fontSize: '12px',
+                    maxWidth: isMobile ? '110px' : '170px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {optionLabel(opt)}
+                </span>
+              ))}
+              {selectedCount > 2 && (
+                <span style={{ fontSize: '12px', color: '#374151', fontWeight: 600 }}>+{selectedCount - 2} more</span>
+              )}
+            </>
+          )}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '8px' }}>
+          {selectedCount > 0 && (
+            <span style={{ fontSize: '12px', color: '#1d4ed8', fontWeight: 700, background: '#dbeafe', borderRadius: '999px', padding: '3px 8px' }}>
+              {selectedCount}
+            </span>
+          )}
+          <FiChevronDown style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s', color: '#6b7280' }} />
+        </div>
+      </button>
+
+      {selectedCount > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
+          {selectedOptions.slice(0, 5).map((opt) => (
+            <button
+              key={`chip-${optionValue(opt)}`}
+              type="button"
+              onClick={() => removeOne(optionValue(opt))}
+              style={{
+                border: '1px solid #bfdbfe',
+                background: '#f8fbff',
+                color: '#1d4ed8',
+                borderRadius: '999px',
+                padding: '4px 8px',
+                fontSize: '12px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                cursor: 'pointer'
+              }}
+              title="Remove selection"
+            >
+              <span style={{ maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {optionLabel(opt)}
+              </span>
+              <FiX size={12} />
+            </button>
+          ))}
+        </div>
+      )}
+
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            style={{
+              marginTop: '8px',
+              border: '1px solid #dbeafe',
+              borderRadius: '12px',
+              background: '#fff',
+              boxShadow: '0 16px 40px rgba(30,41,59,0.16)',
+              maxHeight: '340px',
+              overflow: 'hidden'
+            }}
+          >
+            <div style={{ padding: '10px', borderBottom: '1px solid #eef2ff', background: '#f8fafc' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <FiSearch style={{ color: '#64748b' }} />
+                <input
+                  ref={searchRef}
+                  type="text"
+                  placeholder={`Search ${name}...`}
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  style={{
+                    width: '100%',
+                    border: 'none',
+                    outline: 'none',
+                    background: 'transparent',
+                    fontSize: '14px',
+                    color: '#0f172a'
+                  }}
+                />
+              </div>
+              <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '12px', color: '#64748b' }}>{filteredOptions.length} options</span>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button type="button" onClick={selectAllFiltered} style={{ border: '1px solid #bfdbfe', background: '#eff6ff', color: '#1d4ed8', borderRadius: '999px', padding: '3px 10px', fontSize: '12px', cursor: 'pointer' }}>
+                    Select All
+                  </button>
+                  <button type="button" onClick={clearAll} style={{ border: '1px solid #fecaca', background: '#fff1f2', color: '#b91c1c', borderRadius: '999px', padding: '3px 10px', fontSize: '12px', cursor: 'pointer' }}>
+                    Clear
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div role="listbox" aria-multiselectable="true" style={{ maxHeight: '220px', overflowY: 'auto', padding: '8px' }}>
+              {filteredOptions.length === 0 && (
+                <div style={{ padding: '16px', textAlign: 'center', color: '#64748b', fontSize: '13px' }}>No matching options</div>
+              )}
+              {filteredOptions.map((option) => {
+                const idValue = optionValue(option);
+                const checked = values.includes(idValue);
+                return (
+                  <button
+                    type="button"
+                    key={idValue}
+                    role="option"
+                    aria-selected={checked}
+                    onClick={() => toggleValue(idValue)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      padding: '9px 8px',
+                      cursor: 'pointer',
+                      borderRadius: '8px',
+                      background: checked ? '#eff6ff' : 'transparent',
+                      border: checked ? '1px solid #bfdbfe' : '1px solid transparent',
+                      width: '100%',
+                      textAlign: 'left'
+                    }}
+                  >
+                    <span style={{
+                      width: '18px',
+                      height: '18px',
+                      borderRadius: '999px',
+                      border: checked ? '1px solid #1d4ed8' : '1px solid #cbd5e1',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      background: checked ? '#1d4ed8' : '#fff',
+                      color: '#fff',
+                      flexShrink: 0
+                    }}>
+                      {checked ? <FiCheckCircle size={12} /> : null}
+                    </span>
+                    <span style={{ fontSize: '13px', color: checked ? '#1e3a8a' : '#1f2937', fontWeight: checked ? 600 : 500 }}>
+                      {optionLabel(option)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{ padding: '8px 10px', borderTop: '1px solid #eef2ff', background: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '12px', color: '#475569' }}>{selectedCount} selected</span>
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                style={{ border: '1px solid #cbd5e1', background: '#fff', color: '#1e293b', borderRadius: '8px', padding: '4px 10px', fontSize: '12px', cursor: 'pointer' }}
+              >
+                Done
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {hint && <small style={{ color: '#6b7280', fontSize: '12px' }}>{hint}</small>}
+    </div>
+  );
 };
 
 const formatShortDate = (value?: string): string => {
@@ -1080,21 +1379,44 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
     }
   };
 
-  // Handle battery selection change
+  // Handle battery multi-selection change
   const handleBatteryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const batteryId = e.target.value ? parseInt(e.target.value) : null;
-    
+    let selectedBatteryIds: number[] = [];
+    if (e.target.selectedOptions) {
+      selectedBatteryIds = Array.from(e.target.selectedOptions)
+        .map((o) => parseInt(o.value))
+        .filter((id) => !isNaN(id) && id > 0);
+    } else {
+      try {
+        const parsed = JSON.parse(e.target.value || '[]');
+        if (Array.isArray(parsed)) {
+          selectedBatteryIds = parsed.map((v: any) => parseInt(v)).filter((id: number) => !isNaN(id) && id > 0);
+        }
+      } catch {
+        selectedBatteryIds = [];
+      }
+    }
+
+    const batteryIdsEvent = {
+      target: {
+        name: 'battery_ids',
+        value: JSON.stringify(selectedBatteryIds)
+      }
+    } as React.ChangeEvent<HTMLInputElement>;
+
+    onServiceInputChange(batteryIdsEvent);
+
+    const primaryBatteryId = selectedBatteryIds[0] || null;
     const batteryIdEvent = {
       target: {
         name: 'battery_id',
-        value: batteryId ? batteryId.toString() : ''
+        value: primaryBatteryId ? primaryBatteryId.toString() : ''
       }
     } as React.ChangeEvent<HTMLInputElement>;
-    
     onServiceInputChange(batteryIdEvent);
-    
-    if (batteryId && !isNaN(batteryId) && !editMode) {
-      const selectedBattery = localBatteries.find(b => b.id === batteryId);
+
+    if (primaryBatteryId && !editMode) {
+      const selectedBattery = localBatteries.find(b => b.id === primaryBatteryId);
       if (selectedBattery) {
         if (selectedBattery.purchase_date && selectedBattery.warranty_period) {
           const warrantyMatch = selectedBattery.warranty_period.match(/(\d+)/);
@@ -1125,10 +1447,33 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
     }
   };
 
-  // Handle inverter selection change
+  // Handle inverter multi-selection change
   const handleInverterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const inverterId = e.target.value ? parseInt(e.target.value) : null;
-    
+    let selectedInverterIds: number[] = [];
+    if (e.target.selectedOptions) {
+      selectedInverterIds = Array.from(e.target.selectedOptions)
+        .map((o) => parseInt(o.value))
+        .filter((id) => !isNaN(id) && id > 0);
+    } else {
+      try {
+        const parsed = JSON.parse(e.target.value || '[]');
+        if (Array.isArray(parsed)) {
+          selectedInverterIds = parsed.map((v: any) => parseInt(v)).filter((id: number) => !isNaN(id) && id > 0);
+        }
+      } catch {
+        selectedInverterIds = [];
+      }
+    }
+
+    const inverterIdsEvent = {
+      target: {
+        name: 'inverter_ids',
+        value: JSON.stringify(selectedInverterIds)
+      }
+    } as React.ChangeEvent<HTMLInputElement>;
+    onServiceInputChange(inverterIdsEvent);
+
+    const inverterId = selectedInverterIds[0] || null;
     const inverterIdEvent = {
       target: {
         name: 'inverter_id',
@@ -1191,6 +1536,8 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
         updateField('customer_phone', serviceData.customer_phone || '');
         updateField('battery_id', serviceData.battery_id);
         updateField('inverter_id', serviceData.inverter_id);
+        updateField('battery_ids', JSON.stringify(serviceData.battery_ids || (serviceData.battery_id ? [serviceData.battery_id] : [])));
+        updateField('inverter_ids', JSON.stringify(serviceData.inverter_ids || (serviceData.inverter_id ? [serviceData.inverter_id] : [])));
         updateField('service_staff_id', serviceData.service_staff_id || '');
         updateField('warranty_status', serviceData.warranty_status || 'out_of_warranty');
         // Set AMC status to active if not present or if it's no_amc
@@ -1302,6 +1649,12 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
   const selectedCustomer = localCustomers.find((customer) => customer.id === resolveId(serviceForm.customer_id));
   const selectedBattery = localBatteries.find((battery) => battery.id === resolveId(serviceForm.battery_id));
   const selectedInverter = localInverters.find((inverter) => inverter.id === resolveId(serviceForm.inverter_id));
+  const selectedBatteryIds = Array.isArray(serviceForm.battery_ids)
+    ? serviceForm.battery_ids.map((id) => resolveId(id)).filter((id): id is number => id !== null)
+    : (resolveId(serviceForm.battery_id) ? [resolveId(serviceForm.battery_id) as number] : []);
+  const selectedInverterIds = Array.isArray(serviceForm.inverter_ids)
+    ? serviceForm.inverter_ids.map((id) => resolveId(id)).filter((id): id is number => id !== null)
+    : (resolveId(serviceForm.inverter_id) ? [resolveId(serviceForm.inverter_id) as number] : []);
   const selectedStaffMember = localStaff.find((staff) => staff.id === resolveId(serviceForm.service_staff_id));
 
   const warrantyLabels: Record<string, string> = {
@@ -1658,8 +2011,8 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
                     <FiUser />
                   </span>
                   <div>
-                    <h4 id="service-main-title">Client & Equipment</h4>
-                    <p>Choose who the service is for and the related hardware.</p>
+                    <h4 id="service-main-title">Client & Product</h4>
+                    <p>Choose who the service is for and the related products.</p>
                   </div>
                 </div>
                 <span className="section-badge">Required: Client, Mobile</span>
@@ -1789,46 +2142,54 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
               )}
             </div>
 
-            {/* Battery Selection */}
-            <SearchableDropdown
-              id="battery_id"
-              name="battery_id"
-              value={serviceForm.battery_id || ""}
-              onChange={handleBatteryChange}
+            <MultiSelectDropdown
+              id="battery_ids"
+              name="batteries"
+              values={selectedBatteryIds}
+              onChange={(values) => {
+                const syntheticEvent = {
+                  target: {
+                    name: 'battery_ids',
+                    value: JSON.stringify(values)
+                  }
+                } as React.ChangeEvent<HTMLSelectElement>;
+                handleBatteryChange(syntheticEvent);
+              }}
               options={localBatteries}
               optionLabel={getBatteryLabel}
               optionValue={(battery) => battery.id}
-              placeholder="Select a battery (optional)"
-              label="Select Battery"
+              placeholder="Select battery products"
+              label="Select Battery Products (multiple)"
               icon={<FiBattery />}
-              required={false}
               disabled={loadingData.service}
               loading={loadingData.batteries}
-              hint="Battery is optional. Select if applicable."
-              success={!!serviceForm.battery_id}
+              hint="Dropdown multi-select"
               isMobile={isMobile}
-              allowEmpty={true}
             />
 
-            {/* Inverter Selection */}
-            <SearchableDropdown
-              id="inverter_id"
-              name="inverter_id"
-              value={serviceForm.inverter_id || ""}
-              onChange={handleInverterChange}
+            <MultiSelectDropdown
+              id="inverter_ids"
+              name="inverters"
+              values={selectedInverterIds}
+              onChange={(values) => {
+                const syntheticEvent = {
+                  target: {
+                    name: 'inverter_ids',
+                    value: JSON.stringify(values)
+                  }
+                } as React.ChangeEvent<HTMLSelectElement>;
+                handleInverterChange(syntheticEvent);
+              }}
               options={localInverters}
               optionLabel={getInverterLabel}
               optionValue={(inverter) => inverter.id}
-              placeholder="Select an inverter (optional)"
-              label="Select Inverter"
+              placeholder="Select inverter products"
+              label="Select Inverter Products (multiple)"
               icon={<FiPower />}
-              required={false}
               disabled={loadingData.service}
               loading={loadingData.inverters}
-              hint="Inverter is optional. Select if applicable."
-              success={!!serviceForm.inverter_id}
+              hint="Dropdown multi-select"
               isMobile={isMobile}
-              allowEmpty={true}
             />
 
             {/* Service Staff Selection */}

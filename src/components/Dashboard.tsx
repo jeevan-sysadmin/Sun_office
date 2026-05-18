@@ -540,6 +540,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
     customer_phone: "",
     battery_id: null as number | null,
     inverter_id: null as number | null,
+    battery_ids: [] as number[],
+    inverter_ids: [] as number[],
     service_staff_id: null as number | null,
     issue_description: "",
     warranty_status: "in_warranty" as string,
@@ -1183,7 +1185,13 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
       const data = await response.json();
       
       if (data.success && data.data) {
-        const formattedServices: ServiceOrder[] = data.data.map((service: any) => ({
+        const normalizedServices: ServiceOrder[] = data.data.map((service: any) => {
+          const batteries = Array.isArray(service.batteries) ? service.batteries : [];
+          const inverters = Array.isArray(service.inverters) ? service.inverters : [];
+          const firstBattery = batteries[0] || {};
+          const firstInverter = inverters[0] || {};
+
+          return ({
           id: parseInt(service.id),
           service_code: service.service_code || '',
           customer_id: parseInt(service.customer_id || '0'),
@@ -1192,14 +1200,19 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
           customer_email: service.customer_email || '',
           customer_address: service.customer_address || '',
           battery_id: parseInt(service.battery_id || '0'),
-          battery_model: service.battery_model || '',
-          battery_serial: service.battery_serial || '',
-          battery_brand: service.battery_brand || '',
-          battery_capacity: service.battery_capacity || '',
-          battery_voltage: service.battery_voltage || '',
-          battery_type: service.battery_type || '',
-          inverter_model: service.inverter_model || '',
-          inverter_serial: service.inverter_serial || '', // Ensure string
+          battery_ids: Array.isArray(service.battery_ids) ? service.battery_ids.map((id: any) => parseInt(id)) : [],
+          batteries,
+          battery_model: service.battery_model || firstBattery.battery_model || '',
+          battery_serial: service.battery_serial || firstBattery.battery_serial || '',
+          battery_brand: service.battery_brand || firstBattery.brand || '',
+          battery_capacity: service.battery_capacity || firstBattery.capacity || '',
+          battery_voltage: service.battery_voltage || firstBattery.voltage || '',
+          battery_type: service.battery_type || firstBattery.battery_type || '',
+          inverter_model: service.inverter_model || firstInverter.inverter_model || '',
+          inverter_id: parseInt(service.inverter_id || '0'),
+          inverter_ids: Array.isArray(service.inverter_ids) ? service.inverter_ids.map((id: any) => parseInt(id)) : [],
+          inverters,
+          inverter_serial: service.inverter_serial || firstInverter.inverter_serial || '',
           issue_description: service.issue_description || '',
           status: service.status || 'pending',
           priority: service.priority || 'medium',
@@ -1219,8 +1232,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
           staff_email: service.staff_email || '',
           replacement_battery_serial: service.replacement_battery_serial || '',
           service_type: service.service_type || 'battery_service'
-        }));
-        setServices(formattedServices);
+          });
+        });
+        setServices(normalizedServices);
         setSuccessMessage('Services loaded successfully!');
         setTimeout(() => setSuccessMessage(null), 3000);
       } else {
@@ -1599,6 +1613,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
       customer_phone: service.customer_phone || "",
       battery_id: service.battery_id || null,
       inverter_id: service.inverter_id || null,
+      battery_ids: Array.isArray((service as any).battery_ids) ? (service as any).battery_ids : (service.battery_id ? [service.battery_id] : []),
+      inverter_ids: Array.isArray((service as any).inverter_ids) ? (service as any).inverter_ids : (service.inverter_id ? [service.inverter_id] : []),
       service_staff_id: service.service_staff_id || null,
       issue_description: service.issue_description || "",
       warranty_status: service.warranty_status || "out_of_warranty",
@@ -1728,6 +1744,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
       customer_phone: "",
       battery_id: null,
       inverter_id: null,
+      battery_ids: [],
+      inverter_ids: [],
       service_staff_id: null,
       issue_description: "",
       warranty_status: "in_warranty",
@@ -1761,6 +1779,22 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
   // Service form handlers
   const handleServiceInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
+    if (name === 'battery_ids' || name === 'inverter_ids') {
+      let parsed: number[] = [];
+      try {
+        const arr = JSON.parse(value);
+        if (Array.isArray(arr)) parsed = arr.map((id: any) => Number(id)).filter((id: number) => Number.isInteger(id) && id > 0);
+      } catch {
+        parsed = [];
+      }
+      setServiceForm(prev => ({
+        ...prev,
+        [name]: parsed,
+        battery_id: name === 'battery_ids' ? (parsed[0] || null) : prev.battery_id,
+        inverter_id: name === 'inverter_ids' ? (parsed[0] || null) : prev.inverter_id
+      }));
+      return;
+    }
     setServiceForm(prev => ({
       ...prev,
       [name]: value
@@ -1776,11 +1810,25 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
       const url = `${API_BASE_URL}/services.php`;
       const isEdit = selectedService !== null;
       
+      const toValidIds = (value: any): number[] => {
+        if (!Array.isArray(value)) return [];
+        return value
+          .map((id: any) => Number(id))
+          .filter((id: number) => Number.isInteger(id) && id > 0);
+      };
+
+      const batteryIds = toValidIds((serviceForm as any).battery_ids);
+      const inverterIds = toValidIds((serviceForm as any).inverter_ids);
+      const primaryBatteryId = batteryIds[0] || (serviceForm.battery_id ? Number(serviceForm.battery_id) : null);
+      const primaryInverterId = inverterIds[0] || (serviceForm.inverter_id ? Number(serviceForm.inverter_id) : null);
+
       const serviceData: any = {
         customer_id: serviceForm.customer_id || "",
         customer_phone: serviceForm.customer_phone || "",
-        battery_id: serviceForm.battery_id || "",
-        inverter_id: serviceForm.inverter_id || "",
+        battery_ids: batteryIds,
+        inverter_ids: inverterIds,
+        battery_id: primaryBatteryId || "",
+        inverter_id: primaryInverterId || "",
         service_staff_id: serviceForm.service_staff_id || "",
         issue_description: serviceForm.issue_description || "",
         warranty_status: serviceForm.warranty_status || "out_of_warranty",
@@ -1826,7 +1874,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
         setSuccessMessage(isEdit ? 'Service updated successfully!' : 'Service created successfully!');
         setTimeout(() => setSuccessMessage(null), 3000);
       } else {
-        throw new Error(data.message || 'Failed to save service');
+        const detail = data.error ? ` (${data.error})` : '';
+        throw new Error((data.message || 'Failed to save service') + detail);
       }
       
     } catch (error: any) {

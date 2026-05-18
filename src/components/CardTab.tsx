@@ -40,10 +40,20 @@ const MotionDiv = motion.div;
 const MotionButton = motion.button;
 const MotionTr = motion.tr;
 
+const getBatteryNames = (service: ServiceOrder): string => {
+  const batteries = Array.isArray((service as any).batteries) ? (service as any).batteries : [];
+  if (batteries.length > 0) {
+    return batteries.map((b: any) => b?.battery_model || `Battery #${b?.id}`).join(', ');
+  }
+  return service.battery_model || '-';
+};
+
 interface WaterServicePayment {
   id: number;
   service_id: number;
   customer_id: number;
+  battery_id?: number | null;
+  battery_name?: string | null;
   amount: number;
   service_date: string;
   notes: string;
@@ -247,20 +257,29 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   mode
 }) => {
   const [amount, setAmount] = React.useState<string>("");
+  const [batteryId, setBatteryId] = React.useState<string>("");
   const [serviceDate, setServiceDate] = React.useState<string>("");
   const [notes, setNotes] = React.useState<string>("");
   const [isSubmitting, setIsSubmitting] = React.useState<boolean>(false);
   const [error, setError] = React.useState<string>("");
 
   React.useEffect(() => {
+    const batteries = Array.isArray((service as any)?.batteries) ? (service as any).batteries : [];
+    const defaultBatteryId =
+      batteries.length > 0
+        ? String(batteries[0]?.id || '')
+        : (service?.battery_id ? String(service.battery_id) : '');
+
     if (mode === 'edit' && payment) {
       setAmount(payment.amount.toString());
       setServiceDate(payment.service_date);
       setNotes(payment.notes || "");
+      setBatteryId(payment.battery_id ? String(payment.battery_id) : defaultBatteryId);
     } else if (service) {
       setAmount("");
       setServiceDate(new Date().toISOString().split('T')[0]);
       setNotes(`Water service payment for service #${service.service_code} - ${service.customer_name}`);
+      setBatteryId(defaultBatteryId);
     }
     setError("");
   }, [payment, service, mode]);
@@ -274,6 +293,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
         const paymentData: {
           service_id: number;
           customer_id: number;
+          battery_id?: number | null;
           amount: number;
           service_date: string;
           notes: string;
@@ -282,6 +302,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
         } = {
           service_id: service.id,
           customer_id: service.customer_id,
+          battery_id: batteryId ? parseInt(batteryId, 10) : null,
           amount: parseFloat(amount),
           service_date: serviceDate,
           notes: notes || `Water service payment for service #${service.service_code}`,
@@ -486,9 +507,53 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                   fontSize: '13px',
                   color: '#4b5563'
                 }}>
-                  <span><strong>Battery:</strong> {service.battery_model}</span>
+                  <span><strong>Batteries:</strong> {
+                    Array.isArray((service as any).batteries) && (service as any).batteries.length > 0
+                      ? (service as any).batteries.map((b: any) => b?.battery_model || `#${b?.id}`).join(', ')
+                      : (service.battery_model || '-')
+                  }</span>
                   <span><strong>Warranty:</strong> {service.warranty_status}</span>
                 </div>
+              </div>
+
+              {/* Battery Selection */}
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  color: '#374151',
+                  marginBottom: '8px'
+                }}>
+                  Battery *
+                </label>
+                <select
+                  value={batteryId}
+                  onChange={(e) => setBatteryId(e.target.value)}
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    borderRadius: '10px',
+                    border: '1px solid #d1d5db',
+                    backgroundColor: '#fff',
+                    color: '#111827',
+                    fontSize: '14px',
+                    outline: 'none'
+                  }}
+                >
+                  {Array.isArray((service as any).batteries) && (service as any).batteries.length > 0 ? (
+                    (service as any).batteries.map((b: any) => (
+                      <option key={b?.id} value={String(b?.id || '')}>
+                        {(b?.battery_model || 'Battery')} {b?.battery_serial ? `(${b.battery_serial})` : ''}
+                      </option>
+                    ))
+                  ) : (
+                    <option value={service.battery_id ? String(service.battery_id) : ''}>
+                      {service.battery_model || 'Battery'}
+                    </option>
+                  )}
+                </select>
               </div>
 
               {/* Amount Input */}
@@ -653,20 +718,20 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                 type="submit"
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                disabled={!amount || !serviceDate || isSubmitting}
+                disabled={!amount || !serviceDate || !batteryId || isSubmitting}
                 style={{
                   padding: '12px 24px',
                   borderRadius: '10px',
                   border: 'none',
-                  background: !amount || !serviceDate ? '#9ca3af' : (mode === 'edit' ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)'),
+                  background: !amount || !serviceDate || !batteryId ? '#9ca3af' : (mode === 'edit' ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)'),
                   color: '#fff',
                   fontSize: '14px',
                   fontWeight: '500',
-                  cursor: !amount || !serviceDate || isSubmitting ? 'not-allowed' : 'pointer',
+                  cursor: !amount || !serviceDate || !batteryId || isSubmitting ? 'not-allowed' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
-                  opacity: !amount || !serviceDate || isSubmitting ? 0.6 : 1
+                  opacity: !amount || !serviceDate || !batteryId || isSubmitting ? 0.6 : 1
                 }}
               >
                 <FiSave size={16} />
@@ -1008,6 +1073,8 @@ const PaymentHistoryModal: React.FC<PaymentHistoryModalProps> = ({
       const headers = [
         'Payment ID',
         'Service ID',
+        'Battery ID',
+        'Battery Name',
         'Service Code',
         'Customer Name',
         'Customer Phone',
@@ -1024,6 +1091,8 @@ const PaymentHistoryModal: React.FC<PaymentHistoryModalProps> = ({
         const row = [
           payment.id,
           payment.service_id,
+          payment.battery_id || '',
+          `"${(payment.battery_name || '').replace(/"/g, '""')}"`,
           `"${service.service_code}"`,
           `"${service.customer_name || ''}"`,
           `"${service.customer_phone || ''}"`,
@@ -1037,7 +1106,7 @@ const PaymentHistoryModal: React.FC<PaymentHistoryModalProps> = ({
 
       // Add summary row
       csvContent += '\n';
-      csvContent += `"Total Payments","","","","",${totalAmount},"","",""\n`;
+      csvContent += `"Total Payments","","","","","",${totalAmount},"","",""\n`;
 
       // Create download link
       const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -1105,7 +1174,7 @@ const PaymentHistoryModal: React.FC<PaymentHistoryModalProps> = ({
       yPos += 6;
       doc.text(`Customer Phone: ${service.customer_phone || 'N/A'}`, 14, yPos);
       yPos += 6;
-      doc.text(`Battery Model: ${service.battery_model || 'N/A'}`, 14, yPos);
+      doc.text(`Batteries: ${Array.isArray((service as any).batteries) && (service as any).batteries.length > 0 ? (service as any).batteries.map((b: any) => b?.battery_model || `#${b?.id}`).join(', ') : (service.battery_model || 'N/A')}`, 14, yPos);
       yPos += 6;
       doc.text(`Total Payments: ${formatCurrency(totalAmount)}`, 14, yPos);
       yPos += 6;
@@ -1114,9 +1183,10 @@ const PaymentHistoryModal: React.FC<PaymentHistoryModalProps> = ({
       doc.text(`Generated: ${new Date().toLocaleString()}`, 14, yPos);
 
       // Prepare table data
-      const tableColumn = ['Date', 'Amount', 'Notes', 'Created At'];
+      const tableColumn = ['Date', 'Battery', 'Amount', 'Notes', 'Created At'];
       const tableRows = payments.map(payment => [
         formatDate(payment.service_date),
+        payment.battery_name || (payment.battery_id ? `Battery #${payment.battery_id}` : '-'),
         formatCurrency(payment.amount),
         payment.notes || '-',
         formatDateTime(payment.created_at)
@@ -1640,7 +1710,7 @@ const PaymentHistoryModal: React.FC<PaymentHistoryModalProps> = ({
                         <FiPhone size={12} /> {service.customer_phone}
                       </span>
                       <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <FiBattery size={12} /> {service.battery_model}
+                        <FiBattery size={12} /> {getBatteryNames(service)}
                       </span>
                     </div>
                   </div>
@@ -1751,6 +1821,7 @@ const PaymentHistoryModal: React.FC<PaymentHistoryModalProps> = ({
                             borderBottom: '1px solid #e5e7eb'
                           }}>
                             <th style={{ padding: '12px 16px', textAlign: 'left', color: '#374151', fontWeight: '600' }}>Date</th>
+                            <th style={{ padding: '12px 16px', textAlign: 'left', color: '#374151', fontWeight: '600' }}>Battery</th>
                             <th style={{ padding: '12px 16px', textAlign: 'left', color: '#374151', fontWeight: '600' }}>Amount</th>
                             <th style={{ padding: '12px 16px', textAlign: 'left', color: '#374151', fontWeight: '600' }}>Notes</th>
                             <th style={{ padding: '12px 16px', textAlign: 'left', color: '#374151', fontWeight: '600' }}>Created At</th>
@@ -1772,6 +1843,11 @@ const PaymentHistoryModal: React.FC<PaymentHistoryModalProps> = ({
                               <td style={{ padding: '14px 16px' }}>
                                 <span style={{ fontWeight: '500', color: '#111827' }}>
                                   {formatDate(payment.service_date)}
+                                </span>
+                              </td>
+                              <td style={{ padding: '14px 16px' }}>
+                                <span style={{ color: '#4b5563' }}>
+                                  {payment.battery_name || (payment.battery_id ? `Battery #${payment.battery_id}` : '-')}
                                 </span>
                               </td>
                               <td style={{ padding: '14px 16px' }}>
@@ -2378,6 +2454,14 @@ const CardTab: React.FC<CardTabProps> = ({
   const getEquipmentType = (service: ServiceOrder) => {
     if (service.battery_model) return 'battery';
     return 'unknown';
+  };
+
+  const getBatterySerials = (service: ServiceOrder): string => {
+    const batteries = Array.isArray((service as any).batteries) ? (service as any).batteries : [];
+    if (batteries.length > 0) {
+      return batteries.map((b: any) => b?.battery_serial || '-').join(', ');
+    }
+    return service.battery_serial || '-';
   };
 
   // Get equipment icon - using Droplet for water services
@@ -3064,9 +3148,9 @@ const CardTab: React.FC<CardTabProps> = ({
                 {getEquipmentIcon(service)}
               </div>
               <div>
-                <div style={{ fontSize: '13px', fontWeight: '500' }}>{service.battery_model}</div>
+                <div style={{ fontSize: '13px', fontWeight: '500' }}>{getBatteryNames(service)}</div>
                 <div style={{ fontSize: '10px', color: '#6b7280', fontFamily: 'monospace' }}>
-                  {service.battery_serial}
+                  {getBatterySerials(service)}
                 </div>
               </div>
             </div>
@@ -4280,9 +4364,9 @@ const CardTab: React.FC<CardTabProps> = ({
                                 {getEquipmentIcon(service)}
                               </div>
                               <div>
-                                <div style={{ fontWeight: '500', fontSize: isTablet ? '12px' : '13px' }}>{service.battery_model}</div>
+                                <div style={{ fontWeight: '500', fontSize: isTablet ? '12px' : '13px' }}>{getBatteryNames(service)}</div>
                                 <div style={{ fontSize: isTablet ? '9px' : '10px', color: '#6b7280', fontFamily: 'monospace' }}>
-                                  {service.battery_serial}
+                                  {getBatterySerials(service)}
                                 </div>
                               </div>
                             </div>
