@@ -8,6 +8,7 @@ import * as THREE from "three";
 
 // Import your logo
 import sunLogo from "../assets/sunlogo.png";
+import { LOGIN_URL } from "../config/api";
 
 // Type definitions based on your PHP API response
 interface User {
@@ -169,7 +170,7 @@ async function apiLogin(email: string, password: string): Promise<LoginResponse>
 
   try {
     // Use the correct endpoint
-    const response = await fetch("http://localhost/sun_office/api/login.php", {
+    const response = await fetch(LOGIN_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

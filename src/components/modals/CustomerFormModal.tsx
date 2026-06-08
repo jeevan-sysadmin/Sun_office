@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   FiX, 
@@ -15,6 +15,7 @@ import {
   FiCheck,
   FiInfo
 } from "react-icons/fi";
+import { API_BASE_URL } from "../../config/api";
 
 interface Customer {
   id: number;
@@ -45,13 +46,12 @@ interface CustomerFormModalProps {
   showSnackbar?: (message: string, severity: 'success' | 'error') => void;
 }
 
-const API_BASE_URL = "http://localhost/sun_office/api";
-
 const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
   open,
   onClose,
   mode,
   data,
+  customers = [],
   onSuccess,
   showSnackbar
 }) => {
@@ -59,6 +59,7 @@ const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
     full_name: "",
     email: "",
     phone: "",
+    alternate_phone: "",
     address: "",
     city: "",
     state: "",
@@ -73,7 +74,26 @@ const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string>("");
   const [activeStep, setActiveStep] = useState<'basic' | 'address' | 'notes'>('basic');
+  const [showCitySuggestions, setShowCitySuggestions] = useState(false);
   const getCleanContactNumber = (value: string) => value.replace(/\D/g, '');
+  const uniqueCities = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          customers
+            .map((customer) => (customer.city || "").trim())
+            .filter((city) => city.length > 0)
+        )
+      ),
+    [customers]
+  );
+  const citySuggestions = useMemo(() => {
+    const query = formData.city.trim().toLowerCase();
+    if (!query) return [];
+    return uniqueCities
+      .filter((city) => city.toLowerCase().includes(query))
+      .slice(0, 8);
+  }, [formData.city, uniqueCities]);
 
   // Reset form when modal opens/closes or mode/data changes
   useEffect(() => {
@@ -83,6 +103,7 @@ const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
           full_name: data.full_name || "",
           email: data.email || "",
           phone: data.phone || "",
+          alternate_phone: data.alternate_phone || "",
           address: data.address || "",
           city: data.city || "",
           state: data.state || "",
@@ -94,6 +115,7 @@ const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
           full_name: "",
           email: "",
           phone: "",
+          alternate_phone: "",
           address: "",
           city: "",
           state: "",
@@ -129,6 +151,13 @@ const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
           return "Enter a valid email address";
         }
         return "";
+
+      case 'alternate_phone':
+        if (value && value.trim()) {
+          const cleanedAltPhone = getCleanContactNumber(value);
+          if (cleanedAltPhone.length < 6 || cleanedAltPhone.length > 12) return "Enter a valid alternate phone number (6-12 digits)";
+        }
+        return "";
       
       case 'zip_code':
         if (value && value.trim()) {
@@ -161,6 +190,9 @@ const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
     
     const emailError = validateField('email', formData.email);
     if (emailError) newErrors.email = emailError;
+
+    const alternatePhoneError = validateField('alternate_phone', formData.alternate_phone);
+    if (alternatePhoneError) newErrors.alternate_phone = alternatePhoneError;
     
     const zipError = validateField('zip_code', formData.zip_code);
     if (zipError) newErrors.zip_code = zipError;
@@ -207,11 +239,12 @@ const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
     
     try {
       const cleanedPhone = formData.phone.replace(/\D/g, '');
+      const cleanedAlternatePhone = formData.alternate_phone.replace(/\D/g, '');
       
       const customerData: any = {
         full_name: formData.full_name.trim(),
         phone: cleanedPhone,
-        alternate_phone: null,
+        alternate_phone: cleanedAlternatePhone ? cleanedAlternatePhone : null,
         email: formData.email && formData.email.trim() ? formData.email.trim() : null,
         address: formData.address && formData.address.trim() ? formData.address.trim() : null,
         city: formData.city && formData.city.trim() ? formData.city.trim() : null,
@@ -649,6 +682,49 @@ const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                         )}
                       </div>
 
+                      <div style={{ marginBottom: "24px" }}>
+                        <label style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "8px",
+                          marginBottom: "8px",
+                          fontSize: "14px",
+                          fontWeight: "600",
+                          color: "#1e293b"
+                        }}>
+                          <FiPhone size={16} />
+                          Alternate Phone
+                        </label>
+                        <input
+                          type="tel"
+                          name="alternate_phone"
+                          value={formData.alternate_phone}
+                          onChange={handleInputChange}
+                          placeholder="Enter alternate phone number"
+                          disabled={loading}
+                          style={{
+                            width: "100%",
+                            padding: "12px 16px",
+                            border: `2px solid ${errors.alternate_phone && touched.alternate_phone ? '#ef4444' : '#e2e8f0'}`,
+                            borderRadius: "12px",
+                            fontSize: "14px",
+                            transition: "all 0.2s",
+                            outline: "none",
+                            backgroundColor: loading ? "#f8fafc" : "white"
+                          }}
+                          onFocus={(e) => e.target.style.borderColor = "#667eea"}
+                          onBlur={(e) => {
+                            e.target.style.borderColor = errors.alternate_phone && touched.alternate_phone ? '#ef4444' : '#e2e8f0';
+                            handleBlur('alternate_phone');
+                          }}
+                        />
+                        {errors.alternate_phone && touched.alternate_phone && (
+                          <div style={{ color: "#ef4444", fontSize: "12px", marginTop: "6px" }}>
+                            {errors.alternate_phone}
+                          </div>
+                        )}
+                      </div>
+
                       <div>
                         <label style={{
                           display: "flex",
@@ -739,7 +815,7 @@ const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                       </div>
 
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "20px" }}>
-                        <div>
+                        <div style={{ position: "relative" }}>
                           <label style={{
                             display: "block",
                             marginBottom: "8px",
@@ -766,9 +842,54 @@ const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                               outline: "none",
                               backgroundColor: loading ? "#f8fafc" : "white"
                             }}
-                            onFocus={(e) => e.target.style.borderColor = "#667eea"}
-                            onBlur={(e) => e.target.style.borderColor = "#e2e8f0"}
+                            onFocus={(e) => {
+                              e.target.style.borderColor = "#667eea";
+                              setShowCitySuggestions(true);
+                            }}
+                            onBlur={(e) => {
+                              e.target.style.borderColor = "#e2e8f0";
+                              setTimeout(() => setShowCitySuggestions(false), 150);
+                            }}
                           />
+                          {showCitySuggestions && citySuggestions.length > 0 && (
+                            <div style={{
+                              position: "absolute",
+                              top: "calc(100% + 6px)",
+                              left: 0,
+                              right: 0,
+                              border: "1px solid #e2e8f0",
+                              borderRadius: "10px",
+                              backgroundColor: "#ffffff",
+                              boxShadow: "0 10px 20px rgba(0,0,0,0.08)",
+                              zIndex: 10,
+                              maxHeight: "180px",
+                              overflowY: "auto"
+                            }}>
+                              {citySuggestions.map((cityName) => (
+                                <button
+                                  key={cityName}
+                                  type="button"
+                                  onMouseDown={(event) => event.preventDefault()}
+                                  onClick={() => {
+                                    setFormData((prev) => ({ ...prev, city: cityName }));
+                                    setShowCitySuggestions(false);
+                                  }}
+                                  style={{
+                                    width: "100%",
+                                    textAlign: "left",
+                                    padding: "10px 12px",
+                                    border: "none",
+                                    background: "transparent",
+                                    cursor: "pointer",
+                                    fontSize: "13px",
+                                    color: "#1e293b"
+                                  }}
+                                >
+                                  {cityName}
+                                </button>
+                              ))}
+                            </div>
+                          )}
                         </div>
 
                         <div>

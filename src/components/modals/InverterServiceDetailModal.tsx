@@ -66,6 +66,27 @@ const InverterServiceDetailModal: React.FC<InverterServiceDetailModalProps> = ({
   }
 
   const service = rawService;
+  const selectedInverters = Array.isArray(service.inverters) ? service.inverters : [];
+  const inverterModelsText = selectedInverters.length > 0
+    ? selectedInverters.map((inv) => inv?.inverter_model).filter(Boolean).join(", ")
+    : (service.inverter_model || "N/A");
+  const inverterSerialsText = selectedInverters.length > 0
+    ? selectedInverters.map((inv) => inv?.inverter_serial).filter(Boolean).join(", ")
+    : (service.inverter_serial || "");
+  const inverterBrandsText = selectedInverters.length > 0
+    ? Array.from(new Set(selectedInverters.map((inv) => inv?.inverter_brand).filter(Boolean) as string[])).join(", ")
+    : (service.inverter_brand || "");
+  const inverterCards = selectedInverters.length > 0
+    ? selectedInverters
+    : [{
+        id: service.inverter_id || 0,
+        inverter_brand: service.inverter_brand || "",
+        inverter_model: service.inverter_model || "",
+        inverter_serial: service.inverter_serial || "",
+        power_rating: service.inverter_power_rating || "",
+        wave_type: service.inverter_wave_type || "",
+        battery_voltage: ""
+      }];
 
   // Format currency
   const formatCurrency = (amount?: number | string) => {
@@ -142,9 +163,9 @@ const InverterServiceDetailModal: React.FC<InverterServiceDetailModalProps> = ({
       {
         title: "Inverter Details",
         fields: [
-          { label: "Brand", value: service.inverter_brand || "N/A" },
-          { label: "Model", value: service.inverter_model || "N/A" },
-          { label: "Serial Number", value: service.inverter_serial || null },
+          { label: "Brand", value: inverterBrandsText || "N/A" },
+          { label: "Model", value: inverterModelsText || "N/A" },
+          { label: "Serial Number", value: inverterSerialsText || null },
           { label: "Power Rating", value: service.inverter_power_rating || "N/A" },
           { label: "Inverter Type", value: formatReceiptLabel(service.inverter_type) || null },
           { label: "Wave Type", value: formatReceiptLabel(service.inverter_wave_type) || null },
@@ -872,48 +893,44 @@ const InverterServiceDetailModal: React.FC<InverterServiceDetailModalProps> = ({
                     <FiServer style={{ fontSize: isMobile ? '16px' : '18px' }} />
                     Inverter Information
                   </h3>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '12px' : '14px' }}>
-                    <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', gap: isMobile ? '4px' : '0' }}>
-                      <span style={{ color: '#64748b', fontSize: isMobile ? '13px' : '14px' }}>Brand:</span>
-                      <span style={{ color: '#1e293b', fontSize: isMobile ? '14px' : '14px', fontWeight: '500' }}>{service.inverter_brand || 'N/A'}</span>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', gap: isMobile ? '4px' : '0' }}>
-                      <span style={{ color: '#64748b', fontSize: isMobile ? '13px' : '14px' }}>Model:</span>
-                      <span style={{ color: '#1e293b', fontSize: isMobile ? '14px' : '14px', fontWeight: '500' }}>{service.inverter_model || 'N/A'}</span>
-                    </div>
-                    {service.inverter_serial && (
-                      <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', gap: isMobile ? '4px' : '0' }}>
-                        <span style={{ color: '#64748b', fontSize: isMobile ? '13px' : '14px' }}>Serial:</span>
-                        <span style={{ 
-                          color: '#1e293b', 
-                          fontSize: isMobile ? '14px' : '14px', 
-                          fontWeight: '500', 
-                          fontFamily: 'monospace', 
-                          background: '#f1f5f9', 
-                          padding: isMobile ? '2px 6px' : '4px 8px', 
-                          borderRadius: '4px',
-                          wordBreak: 'break-all'
-                        }}>
-                          {service.inverter_serial}
-                        </span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '10px' : '12px' }}>
+                    {inverterCards.map((inv: any, index: number) => (
+                      <div
+                        key={`${inv.id || 'inv'}-${index}`}
+                        style={{
+                          border: '1px solid #dbeafe',
+                          background: '#f8fbff',
+                          borderRadius: '10px',
+                          padding: isMobile ? '10px' : '12px'
+                        }}
+                      >
+                        <div style={{ fontSize: '12px', fontWeight: 700, color: '#2563eb', marginBottom: '8px' }}>
+                          Inverter {index + 1}
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                            <span style={{ color: '#64748b', fontSize: isMobile ? '12px' : '13px' }}>Brand:</span>
+                            <span style={{ color: '#1e293b', fontSize: isMobile ? '13px' : '14px', fontWeight: 500 }}>{inv.inverter_brand || 'N/A'}</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                            <span style={{ color: '#64748b', fontSize: isMobile ? '12px' : '13px' }}>Model:</span>
+                            <span style={{ color: '#1e293b', fontSize: isMobile ? '13px' : '14px', fontWeight: 500 }}>{inv.inverter_model || 'N/A'}</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                            <span style={{ color: '#64748b', fontSize: isMobile ? '12px' : '13px' }}>Serial:</span>
+                            <span style={{ color: '#1e293b', fontSize: isMobile ? '13px' : '14px', fontWeight: 500, fontFamily: 'monospace' }}>{inv.inverter_serial || 'N/A'}</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                            <span style={{ color: '#64748b', fontSize: isMobile ? '12px' : '13px' }}>Power Rating:</span>
+                            <span style={{ color: '#1e293b', fontSize: isMobile ? '13px' : '14px', fontWeight: 500 }}>{inv.power_rating || service.inverter_power_rating || 'N/A'}</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                            <span style={{ color: '#64748b', fontSize: isMobile ? '12px' : '13px' }}>Type:</span>
+                            <span style={{ color: '#1e293b', fontSize: isMobile ? '13px' : '14px', fontWeight: 500 }}>{service.inverter_type || 'N/A'}</span>
+                          </div>
+                        </div>
                       </div>
-                    )}
-                    <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', gap: isMobile ? '4px' : '0' }}>
-                      <span style={{ color: '#64748b', fontSize: isMobile ? '13px' : '14px' }}>Power Rating:</span>
-                      <span style={{ color: '#1e293b', fontSize: isMobile ? '14px' : '14px', fontWeight: '500' }}>{service.inverter_power_rating || 'N/A'}</span>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', gap: isMobile ? '4px' : '0' }}>
-                      <span style={{ color: '#64748b', fontSize: isMobile ? '13px' : '14px' }}>Type:</span>
-                      <span style={{ color: '#1e293b', fontSize: isMobile ? '14px' : '14px', fontWeight: '500' }}>{service.inverter_type || 'N/A'}</span>
-                    </div>
-                    {service.inverter_wave_type && (
-                      <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', gap: isMobile ? '4px' : '0' }}>
-                        <span style={{ color: '#64748b', fontSize: isMobile ? '13px' : '14px' }}>Wave Type:</span>
-                        <span style={{ color: '#1e293b', fontSize: isMobile ? '14px' : '14px', fontWeight: '500' }}>
-                          {service.inverter_wave_type.replace(/_/g, ' ')}
-                        </span>
-                      </div>
-                    )}
+                    ))}
                   </div>
                 </div>
 

@@ -40,6 +40,7 @@ import {
   alpha,
   LinearProgress
 } from '@mui/material';
+import { API_BASE_URL } from "../../config/api";
 import type { SelectChangeEvent } from '@mui/material';
 import {
   Close as CloseIcon,
@@ -443,8 +444,6 @@ const StepIcon = styled(Avatar, {
   color: active ? 'white' : '#9CA3AF',
   transition: 'all 0.3s ease'
 }));
-
-const API_BASE_URL = "http://localhost/sun_office/api";
 
 const StaffFormModal: React.FC<StaffFormModalProps> = ({
   open,

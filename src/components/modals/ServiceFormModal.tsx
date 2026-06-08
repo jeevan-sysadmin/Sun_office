@@ -23,6 +23,7 @@ import {
 
 // Import types using 'import type' for verbatimModuleSyntax
 import type { Customer, Battery, Inverter } from '../types';
+import { API_BASE_URL } from "../../config/api";
 
 // Enhanced Searchable Dropdown Component with better UX
 interface SearchableDropdownProps {
@@ -625,16 +626,6 @@ interface ServiceFormModalProps {
   onFetchServiceData?: (serviceId: number) => Promise<any>;
 }
 
-// Helper function to format battery label with battery_code
-const getBatteryLabel = (battery: Battery): string => {
-  const model = battery.battery_model || 'Unknown Model';
-  const brand = battery.brand || 'Unknown Brand';
-  const serial = battery.battery_serial ? ` (${battery.battery_serial})` : '';
-  const code = battery.battery_code ? ` [${battery.battery_code}]` : '';
-  
-  return `${brand} ${model}${serial}${code}`;
-};
-
 // Helper function to format inverter label
 const getInverterLabel = (inverter: Inverter): string => {
   const model = inverter.inverter_model || 'Unknown Model';
@@ -948,11 +939,235 @@ const MultiSelectDropdown: React.FC<MultiSelectDropdownProps> = ({
   );
 };
 
-const formatShortDate = (value?: string): string => {
-  if (!value) return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }).format(date);
+interface BatteryBoxSelectorProps {
+  values: number[];
+  onChange: (values: number[]) => void;
+  options: Battery[];
+  disabled?: boolean;
+  loading?: boolean;
+  isMobile: boolean;
+}
+
+const BatteryBoxSelector: React.FC<BatteryBoxSelectorProps> = ({
+  values,
+  onChange,
+  options,
+  disabled = false,
+  loading = false,
+  isMobile
+}) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, []);
+
+  const filtered = options.filter((battery) => {
+    const model = battery.battery_model || '';
+    const serial = battery.battery_serial || '';
+    const code = battery.battery_code || '';
+    const q = searchTerm.toLowerCase().trim();
+    if (!q) return true;
+    return (
+      model.toLowerCase().includes(q) ||
+      serial.toLowerCase().includes(q) ||
+      code.toLowerCase().includes(q)
+    );
+  });
+
+  const toggle = (id: number) => {
+    if (disabled || loading) return;
+    if (values.includes(id)) {
+      onChange(values.filter((v) => v !== id));
+    } else {
+      onChange([...values, id]);
+    }
+  };
+
+  const selectedBatteries = options.filter((b) => values.includes(b.id));
+
+  return (
+    <div style={{ marginBottom: '20px', position: 'relative' }} ref={dropdownRef}>
+      <label style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        marginBottom: '8px',
+        fontWeight: '600',
+        color: '#374151',
+        fontSize: isMobile ? '14px' : '14px'
+      }}>
+        <FiBattery style={{ color: '#6b7280' }} />
+        Select Battery Products (multiple)
+      </label>
+
+      <button
+        type="button"
+        onClick={() => !disabled && !loading && setIsOpen(!isOpen)}
+        style={{
+          width: '100%',
+          padding: isMobile ? '14px 16px' : '12px 16px',
+          border: '2px solid #e5e7eb',
+          borderRadius: '12px',
+          background: '#fff',
+          textAlign: 'left',
+          fontSize: isMobile ? '14px' : '14px',
+          color: values.length ? '#111827' : '#9ca3af',
+          cursor: disabled || loading ? 'not-allowed' : 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between'
+        }}
+      >
+        <span>{values.length > 0 ? `${values.length} battery selected` : 'Select battery products'}</span>
+        <FiChevronDown style={{ color: '#9ca3af' }} />
+      </button>
+
+      {isOpen && (
+        <div style={{
+          position: 'absolute',
+          top: 'calc(100% + 8px)',
+          left: 0,
+          right: 0,
+          border: '1px solid #e5e7eb',
+          borderRadius: '14px',
+          background: '#ffffff',
+          padding: '10px',
+          zIndex: 30,
+          boxShadow: '0 14px 30px -18px rgba(15,23,42,0.45)'
+        }}>
+          <div style={{ position: 'relative', marginBottom: '10px' }}>
+            <FiSearch style={{
+              position: 'absolute',
+              left: '12px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              color: '#9ca3af'
+            }} />
+            <input
+              type="text"
+              placeholder="Search battery by model / serial / code"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              disabled={disabled || loading}
+              style={{
+                width: '100%',
+                padding: isMobile ? '12px 12px 12px 36px' : '10px 12px 10px 36px',
+                border: '1px solid #e5e7eb',
+                borderRadius: '10px',
+                outline: 'none',
+                fontSize: isMobile ? '14px' : '13px'
+              }}
+            />
+          </div>
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr',
+            gap: '8px',
+            maxHeight: '240px',
+            overflowY: 'auto'
+          }}>
+            {filtered.map((battery) => {
+              const active = values.includes(battery.id);
+              return (
+                <button
+                  key={battery.id}
+                  type="button"
+                  onClick={() => toggle(battery.id)}
+                  disabled={disabled || loading}
+                  style={{
+                    textAlign: 'left',
+                    padding: '10px 12px',
+                    borderRadius: '10px',
+                    border: active ? '2px solid #7c3aed' : '1px solid #e5e7eb',
+                    background: active ? '#f5f3ff' : '#fff',
+                    cursor: disabled || loading ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  <div style={{ fontWeight: 600, color: '#111827', fontSize: '13px' }}>
+                    {battery.battery_model || 'Unknown Model'}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#4b5563' }}>
+                    Serial: {battery.battery_serial || 'N/A'}
+                  </div>
+                </button>
+              );
+            })}
+            {!loading && filtered.length === 0 && (
+              <div style={{ color: '#9ca3af', fontSize: '13px', padding: '8px 4px' }}>
+                No battery products found.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {selectedBatteries.length > 0 && (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+          gap: '10px',
+          marginTop: '10px'
+        }}>
+          {selectedBatteries.map((battery) => {
+            return (
+              <div
+                key={battery.id}
+                style={{
+                  textAlign: 'left',
+                  padding: '12px',
+                  borderRadius: '12px',
+                  border: '2px solid #7c3aed',
+                  background: 'linear-gradient(135deg, #f5f3ff 0%, #eef2ff 100%)',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                  <div style={{ fontWeight: 600, color: '#111827', fontSize: '13px' }}>
+                    {battery.battery_model || 'Unknown Model'}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => toggle(battery.id)}
+                    style={{
+                      border: 'none',
+                      background: 'transparent',
+                      cursor: 'pointer',
+                      color: '#7c3aed',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                    title="Remove"
+                  >
+                    <FiX size={15} />
+                  </button>
+                </div>
+                <div style={{ fontSize: '12px', color: '#4b5563' }}>
+                  Serial: {battery.battery_serial || 'N/A'}
+                </div>
+                <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px' }}>
+                  Code: {battery.battery_code || `BAT${battery.id}`}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <small style={{ marginTop: '6px', color: '#6b7280', fontSize: '12px', display: 'block' }}>
+        Selected: {values.length} product(s). Shows product model and serial number.
+      </small>
+    </div>
+  );
 };
 
 const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
@@ -1003,10 +1218,7 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
   });
   const [error, setError] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
-  const [formProgress, setFormProgress] = useState(0);
   
-  const API_BASE_URL = "http://localhost/sun_office/api";
-
   // Set default AMC status to 'active' when form is initialized and not in edit mode
   // AND when the form is first shown
   useEffect(() => {
@@ -1023,21 +1235,6 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
       }
     }
   }, [showForm, editMode, serviceForm.amc_status, onServiceInputChange]);
-
-  // Calculate form progress
-  useEffect(() => {
-    let completed = 0;
-    let total = 0;
-    
-    // Required fields
-    if (serviceForm.customer_id) completed++;
-    if (serviceForm.customer_phone) completed++;
-    if (serviceForm.warranty_status) completed++;
-    
-    total = 3; // customer_id, customer_phone, warranty_status
-    
-    setFormProgress(Math.round((completed / total) * 100));
-  }, [serviceForm]);
 
   // Validate form before submit
   const validateForm = () => {
@@ -1657,99 +1854,10 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
     : (resolveId(serviceForm.inverter_id) ? [resolveId(serviceForm.inverter_id) as number] : []);
   const selectedStaffMember = localStaff.find((staff) => staff.id === resolveId(serviceForm.service_staff_id));
 
-  const warrantyLabels: Record<string, string> = {
-    in_warranty: 'In Warranty',
-    extended_warranty: 'Extended Warranty',
-    out_of_warranty: 'Out of Warranty'
-  };
-
-  const amcLabels: Record<string, string> = {
-    active: 'Active',
-    expired: 'Expired',
-    no_amc: 'No AMC'
-  };
-
-  const warrantyStatusLabel = serviceForm.warranty_status
-    ? (warrantyLabels[serviceForm.warranty_status] || 'Unknown')
-    : 'Not set';
-  const amcStatusValue = serviceForm.amc_status || 'active';
-  const amcStatusLabel = amcLabels[amcStatusValue] || 'Unknown';
-  const warrantyTone = serviceForm.warranty_status === 'in_warranty'
-    ? 'ok'
-    : serviceForm.warranty_status === 'extended_warranty'
-      ? 'warn'
-      : serviceForm.warranty_status === 'out_of_warranty'
-        ? 'danger'
-        : 'muted';
-  const amcTone = amcStatusValue === 'active'
-    ? 'ok'
-    : amcStatusValue === 'expired'
-      ? 'danger'
-      : amcStatusValue === 'no_amc'
-        ? 'muted'
-        : 'muted';
-  const formattedEta = serviceForm.estimated_completion_date
-    ? formatShortDate(serviceForm.estimated_completion_date)
-    : '';
-
-  const missingRequired = [
-    !serviceForm.customer_id ? 'Client' : null,
-    !serviceForm.customer_phone ? 'Mobile' : null,
-    !serviceForm.warranty_status ? 'Warranty' : null
-  ].filter(Boolean) as string[];
-
-  const requiredTotal = 3;
-  const requiredCompleted = Math.min(requiredTotal, requiredTotal - missingRequired.length);
-  const completionTone = missingRequired.length === 0 ? 'ok' : 'warn';
-  const completionMessage = missingRequired.length === 0
-    ? 'All required fields complete'
-    : `Missing: ${missingRequired.join(', ')}`;
-
-  const summaryItems = [
-    {
-      label: 'Client',
-      value: selectedCustomer ? selectedCustomer.full_name : 'Not selected',
-      sub: serviceForm.customer_phone || selectedCustomer?.phone || '',
-      icon: <FiUser />,
-      muted: !selectedCustomer
-    },
-    {
-      label: 'Battery',
-      value: selectedBattery ? getBatteryLabel(selectedBattery) : 'Not set',
-      icon: <FiBattery />,
-      muted: !selectedBattery
-    },
-    {
-      label: 'Inverter',
-      value: selectedInverter ? getInverterLabel(selectedInverter) : 'Not set',
-      icon: <FiPower />,
-      muted: !selectedInverter
-    },
-    {
-      label: 'Assigned Staff',
-      value: selectedStaffMember ? getStaffLabel(selectedStaffMember) : 'Not assigned',
-      icon: <FiUser />,
-      muted: !selectedStaffMember
-    },
-    {
-      label: 'Warranty',
-      value: warrantyStatusLabel,
-      icon: <FiTag />,
-      tone: warrantyTone
-    },
-    {
-      label: 'AMC',
-      value: amcStatusLabel,
-      icon: <FiClock />,
-      tone: amcTone
-    },
-    {
-      label: 'ETA',
-      value: formattedEta || 'Not set',
-      icon: <FiCalendar />,
-      muted: !formattedEta
-    }
-  ];
+  void selectedCustomer;
+  void selectedBattery;
+  void selectedInverter;
+  void selectedStaffMember;
 
   // Handle refresh
   const handleRefresh = () => {
@@ -1866,75 +1974,6 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
           value={serviceForm.id || editingServiceId || ''}
         />
       )}
-
-      {/* Summary */}
-      <motion.div
-        className="service-summary"
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
-      >
-        <div className="summary-header">
-          <div className="summary-title">
-            <span className="summary-icon">
-              <FiFileText />
-            </span>
-            <div>
-              <h3>Service Snapshot</h3>
-              <p>
-                {editMode
-                  ? 'Review the key details before saving your changes.'
-                  : 'Complete the required fields to finish this service call.'}
-              </p>
-            </div>
-          </div>
-          <span className={`summary-pill summary-pill--${completionTone}`}>
-            {completionMessage}
-          </span>
-        </div>
-
-        {!editMode && (
-          <div className="summary-progress">
-            <div className="summary-progress-bar">
-              <motion.div
-                className="summary-progress-fill"
-                initial={{ width: 0 }}
-                animate={{ width: `${formProgress}%` }}
-                transition={{ duration: 0.5 }}
-              />
-            </div>
-            <div className="summary-progress-meta">
-              <span>{formProgress}% complete</span>
-              <span>{requiredCompleted} of {requiredTotal} required fields</span>
-            </div>
-          </div>
-        )}
-
-        <div className="summary-grid">
-          {summaryItems.map((item) => (
-            <div key={item.label} className="summary-item">
-              <div className="summary-label">
-                <span className="summary-item-icon">{item.icon}</span>
-                {item.label}
-              </div>
-              {item.tone ? (
-                <span className={`summary-pill summary-pill--${item.tone}`}>
-                  {item.value}
-                </span>
-              ) : (
-                <div className={`summary-value${item.muted ? ' muted' : ''}`} title={item.value}>
-                  {item.value}
-                </div>
-              )}
-              {item.sub ? (
-                <div className="summary-sub" title={item.sub}>
-                  {item.sub}
-                </div>
-              ) : null}
-            </div>
-          ))}
-        </div>
-      </motion.div>
 
       {/* Tab Navigation for Mobile */}
       {isMobile && (
@@ -2142,9 +2181,7 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
               )}
             </div>
 
-            <MultiSelectDropdown
-              id="battery_ids"
-              name="batteries"
+            <BatteryBoxSelector
               values={selectedBatteryIds}
               onChange={(values) => {
                 const syntheticEvent = {
@@ -2156,14 +2193,8 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
                 handleBatteryChange(syntheticEvent);
               }}
               options={localBatteries}
-              optionLabel={getBatteryLabel}
-              optionValue={(battery) => battery.id}
-              placeholder="Select battery products"
-              label="Select Battery Products (multiple)"
-              icon={<FiBattery />}
               disabled={loadingData.service}
               loading={loadingData.batteries}
-              hint="Dropdown multi-select"
               isMobile={isMobile}
             />
 
@@ -2621,7 +2652,7 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: 'rgba(0,0,0,0.5)',
+        backgroundColor: 'rgba(15,23,42,0.62)',
         display: 'flex',
         alignItems: isMobile ? 'flex-end' : 'center',
         justifyContent: 'center',
@@ -2654,7 +2685,7 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
           width: '100%',
           maxHeight: isMobile ? '95vh' : '90vh',
           overflowY: 'auto',
-          backgroundColor: '#fff',
+          background: 'linear-gradient(180deg, #ffffff 0%, #f8fbff 100%)',
           borderRadius: isMobile ? '24px 24px 0 0' : '24px',
           boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
           position: 'relative'
@@ -2663,15 +2694,16 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
         {/* Header */}
         <div className="modal-header" style={{
           padding: isMobile ? '20px 20px' : '24px 28px',
-          borderBottom: '1px solid #f3f4f6',
+          borderBottom: '1px solid rgba(255,255,255,0.25)',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'flex-start',
-          background: 'linear-gradient(135deg, #f9fafb 0%, #ffffff 100%)',
+          background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 48%, #06b6d4 100%)',
           position: 'sticky',
           top: 0,
           zIndex: 15,
-          borderRadius: isMobile ? '24px 24px 0 0' : '24px 24px 0 0'
+          borderRadius: isMobile ? '24px 24px 0 0' : '24px 24px 0 0',
+          color: '#ffffff'
         }}>
           <div className="modal-title">
             <motion.h2 
@@ -2680,14 +2712,14 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
               style={{ 
                 margin: 0, 
                 fontSize: isMobile ? '22px' : '26px', 
-                color: '#111827',
+                color: '#ffffff',
                 fontWeight: '700',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '10px'
               }}
             >
-              <FiFileText style={{ color: '#8b5cf6' }} />
+              <FiFileText style={{ color: '#ffffff' }} />
               {getFormTitle()}
             </motion.h2>
             <motion.p 
@@ -2696,7 +2728,7 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
               transition={{ delay: 0.1 }}
               style={{ 
                 margin: '8px 0 0 0', 
-                color: '#6b7280', 
+                color: 'rgba(255,255,255,0.9)', 
                 fontSize: isMobile ? '13px' : '14px' 
               }}
             >
@@ -2716,7 +2748,7 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
                   background: 'none',
                   border: 'none',
                   fontSize: '20px',
-                  color: '#6b7280',
+                  color: '#ffffff',
                   cursor: 'pointer',
                   padding: '10px',
                   display: 'flex',
@@ -2738,11 +2770,11 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
               whileHover={{ rotate: 90, backgroundColor: '#fee2e2', color: '#ef4444' }}
               whileTap={{ scale: 0.9 }}
               disabled={loadingData.service}
-              style={{
-                background: 'none',
-                border: 'none',
-                fontSize: isMobile ? '22px' : '24px',
-                color: '#9ca3af',
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: isMobile ? '22px' : '24px',
+                  color: '#ffffff',
                 cursor: 'pointer',
                 padding: '8px',
                 display: 'flex',
@@ -2764,7 +2796,8 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
         <div style={{ 
           padding: isMobile ? '20px' : '28px', 
           position: 'relative',
-          backgroundColor: '#ffffff'
+          background:
+            'radial-gradient(circle at 12% 0%, rgba(99,102,241,0.10), transparent 35%), radial-gradient(circle at 90% 10%, rgba(6,182,212,0.10), transparent 28%), #f8fbff'
         }}>
           {renderFormContent()}
         </div>
@@ -2971,11 +3004,11 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
         }
 
         .section-card {
-          border: 1px solid #f3f4f6;
+          border: 1px solid #dbeafe;
           border-radius: 18px;
           padding: 18px;
-          background: #ffffff;
-          box-shadow: 0 10px 20px -18px rgba(15, 23, 42, 0.4);
+          background: linear-gradient(180deg, #ffffff 0%, #f9fbff 100%);
+          box-shadow: 0 14px 24px -20px rgba(30, 64, 175, 0.4);
         }
 
         .section-header {
@@ -3009,22 +3042,28 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
           width: 36px;
           height: 36px;
           border-radius: 12px;
-          background: #eef2ff;
-          color: #6366f1;
+          background: linear-gradient(135deg, #e0e7ff 0%, #dbeafe 100%);
+          color: #4f46e5;
           display: inline-flex;
           align-items: center;
           justify-content: center;
+          box-shadow: 0 8px 14px -12px rgba(79, 70, 229, 0.7);
         }
 
         .section-badge {
           font-size: 12px;
           font-weight: 600;
-          color: #6b7280;
-          background: #f9fafb;
+          color: #3730a3;
+          background: #eef2ff;
           padding: 4px 10px;
           border-radius: 999px;
-          border: 1px solid #e5e7eb;
+          border: 1px solid #c7d2fe;
           white-space: nowrap;
+        }
+
+        .dropdown-container .dropdown-button {
+          border-color: #dbeafe !important;
+          background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%) !important;
         }
 
         .section-content .form-group:last-child {

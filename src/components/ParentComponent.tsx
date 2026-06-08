@@ -32,6 +32,7 @@ import "./css/PendingCallsTab.css";
 // Add jsPDF and autoTable for PDF generation
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { API_BASE_URL as DEFAULT_API_BASE_URL } from "../config/api";
 
 interface WaterService {
   id: number;
@@ -105,7 +106,7 @@ interface PendingCallsTabProps {
 const PendingCallsTab: React.FC<PendingCallsTabProps> = ({ 
   onCallCustomer, 
   onMessageCustomer,
-  apiBaseUrl = "http://localhost/sun_office/api"
+  apiBaseUrl = DEFAULT_API_BASE_URL
 }) => {
   // State for cities data
   const [cities, setCities] = useState<City[]>([]);

@@ -2003,6 +2003,15 @@ const ProductsTab: React.FC<ProductsTabProps> = ({
                     }}>Condition</th>
                     <th style={{
                       padding: isTablet ? '12px' : '14px',
+                      textAlign: 'left',
+                      fontWeight: '600',
+                      color: '#ffffff',
+                      fontSize: isTablet ? '11px' : '12px',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
+                    }}>Created Date</th>
+                    <th style={{
+                      padding: isTablet ? '12px' : '14px',
                       textAlign: 'center',
                       fontWeight: '600',
                       color: '#ffffff',
@@ -2142,6 +2151,14 @@ const ProductsTab: React.FC<ProductsTabProps> = ({
                             ? ((item as Battery).battery_condition || 'N/A').toUpperCase()
                             : ((item as Inverter).inverter_condition || 'N/A').toUpperCase()}
                         </span>
+                      </td>
+                      <td style={{ padding: isTablet ? '12px' : '14px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <FiCalendar style={{ color: '#6b7280', fontSize: isTablet ? '11px' : '12px' }} />
+                          <span style={{ fontSize: isTablet ? '12px' : '13px', color: '#4b5563' }}>
+                            {formatDate(item.created_at)}
+                          </span>
+                        </div>
                       </td>
                       <td style={{ padding: isTablet ? '12px' : '14px' }}>
                         <div style={{

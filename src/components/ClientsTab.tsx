@@ -44,6 +44,7 @@ interface ClientsTabProps {
   onEditCustomer: (customer: Customer) => void;
   onDeleteCustomer: (id: number) => void;
   onNewCustomer: () => void;
+  onRefreshCustomers?: () => Promise<void> | void;
   onSaveCustomer?: (customerData: any, isEdit: boolean) => Promise<void>;
   loading?: boolean;
   showSnackbar?: (message: string, severity: 'success' | 'error') => void;
@@ -55,6 +56,7 @@ const ClientsTab: React.FC<ClientsTabProps> = ({
   onEditCustomer,
   onDeleteCustomer,
   onNewCustomer,
+  onRefreshCustomers,
   loading = false,
   showSnackbar
 }) => {
@@ -71,7 +73,6 @@ const ClientsTab: React.FC<ClientsTabProps> = ({
 
   // Search state
   const [searchTerm, setSearchTerm] = useState<string>("");
-  const [searchField, setSearchField] = useState<string>("all");
   
   // Last refreshed state
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
@@ -129,11 +130,6 @@ const ClientsTab: React.FC<ClientsTabProps> = ({
       setLastRefreshed(new Date());
     }
   }, [customers]);
-
-  // Search fields configuration - MODIFIED: Removed options
-  const searchFields = [
-    { value: "all", label: "All Fields" }
-  ];
 
   // Get unique cities for filter
   const uniqueCities = useMemo(() => {
@@ -255,7 +251,7 @@ const ClientsTab: React.FC<ClientsTabProps> = ({
       const term = searchTerm.toLowerCase().trim();
       
       filtered = filtered.filter(customer => {
-        // Always search in all fields regardless of searchField value
+        // Search across all key client fields
         return (
           (customer.customer_code && customer.customer_code.toLowerCase().includes(term)) ||
           (customer.full_name && customer.full_name.toLowerCase().includes(term)) ||
@@ -429,7 +425,6 @@ const ClientsTab: React.FC<ClientsTabProps> = ({
     setToDate("");
     setShowDatePicker(false);
     setSearchTerm("");
-    setSearchField("all");
     setFilterCity("all");
     setFilterState("all");
     setFilterServices("all");
@@ -590,7 +585,10 @@ const ClientsTab: React.FC<ClientsTabProps> = ({
   };
 
   // Handle success from form modal
-  const handleFormSuccess = () => {
+  const handleFormSuccess = async () => {
+    if (onRefreshCustomers) {
+      await onRefreshCustomers();
+    }
     setShowFormModal(false);
     setSelectedCustomer(null);
     setActionInProgress(false);
@@ -621,6 +619,7 @@ const ClientsTab: React.FC<ClientsTabProps> = ({
         'Client Code': customer.customer_code,
         'Full Name': customer.full_name,
         'Phone Number': getContactNumber(customer),
+        'Alternate Phone': customer.alternate_phone || '',
         'Email': customer.email || '',
         'Address': customer.address || '',
         'City': customer.city || '',
@@ -711,19 +710,21 @@ const ClientsTab: React.FC<ClientsTabProps> = ({
       let tableRows: any[][];
 
       if (isMobile) {
-        tableColumn = ['Code', 'Name', 'Phone Number', 'Services'];
+        tableColumn = ['Code', 'Name', 'Phone Number', 'Alternate Phone', 'Services'];
         tableRows = dataToExport.map(customer => [
           customer.customer_code,
           customer.full_name,
           getContactNumber(customer),
+          customer.alternate_phone || '-',
           customer.total_services || '0'
         ]);
       } else {
-        tableColumn = ['Code', 'Name', 'Phone Number', 'Email', 'City', 'State', 'Services', 'Created'];
+        tableColumn = ['Code', 'Name', 'Phone Number', 'Alternate Phone', 'Email', 'City', 'State', 'Services', 'Created'];
         tableRows = dataToExport.map(customer => [
           customer.customer_code,
           customer.full_name,
           getContactNumber(customer),
+          customer.alternate_phone || '-',
           customer.email || '-',
           customer.city || '-',
           customer.state || '-',
@@ -880,6 +881,11 @@ const ClientsTab: React.FC<ClientsTabProps> = ({
           <div style={{ fontSize: '12px', color: '#6b7280', display: 'flex', alignItems: 'center', gap: '4px' }}>
             <FiPhone size={10} /> {getContactNumber(customer)}
           </div>
+          {customer.alternate_phone && (
+            <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px' }}>
+              Alt: {customer.alternate_phone}
+            </div>
+          )}
         </div>
         <div>
           <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '4px' }}>Location</div>
@@ -1229,36 +1235,9 @@ const ClientsTab: React.FC<ClientsTabProps> = ({
             fontSize: '16px',
             zIndex: 1
           }} />
-          {/* MODIFIED: Simplified dropdown to only show All Fields */}
-          <select 
-            value={searchField}
-            onChange={(e) => setSearchField(e.target.value)}
-            style={{
-              position: 'absolute',
-              left: '40px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              padding: '4px 8px',
-              border: '1px solid #d1d5db',
-              borderRadius: '4px',
-              fontSize: '12px',
-              backgroundColor: '#f9fafb',
-              color: '#374151',
-              cursor: 'pointer',
-              zIndex: 1,
-              outline: 'none',
-              width: '70px'
-            }}
-          >
-            {searchFields.map(field => (
-              <option key={field.value} value={field.value}>
-                {field.label}
-              </option>
-            ))}
-          </select>
           <input
             type="text"
-            placeholder={isMobile ? "Search..." : "Search in all fields..."}
+            placeholder={isMobile ? "Search..." : "Search clients..."}
             value={searchTerm}
             onChange={(e) => {
               setSearchTerm(e.target.value);
@@ -1269,7 +1248,7 @@ const ClientsTab: React.FC<ClientsTabProps> = ({
             className="search-input"
             style={{
               width: '100%',
-              padding: isMobile ? '10px 12px 10px 120px' : '10px 12px 10px 120px',
+              padding: isMobile ? '10px 12px 10px 40px' : '10px 12px 10px 40px',
               borderRadius: '8px',
               border: '1px solid #d1d5db',
               fontSize: isMobile ? '14px' : '14px',
@@ -2154,6 +2133,11 @@ const ClientsTab: React.FC<ClientsTabProps> = ({
                           <FiPhone style={{ color: '#10b981', fontSize: isTablet ? '12px' : '13px' }} />
                           <span style={{ fontSize: isTablet ? '12px' : '13px' }}>{getContactNumber(customer)}</span>
                         </div>
+                        {customer.alternate_phone && (
+                          <div style={{ fontSize: isTablet ? '10px' : '11px', color: '#94a3b8', marginTop: '4px' }}>
+                            Alt: {customer.alternate_phone}
+                          </div>
+                        )}
                       </td>
                       <td style={{ padding: isTablet ? '12px' : '14px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>

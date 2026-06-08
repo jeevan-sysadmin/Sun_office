@@ -1,5 +1,5 @@
 // C:\Users\JEEVANLAROSH\Downloads\Sun computers\sun office\src\components\Dashboard.tsx
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   FiMenu,
@@ -22,31 +22,34 @@ import {
   FiDollarSign,
   FiUserCheck,
   FiServer,
+  FiBarChart2,
+  FiDatabase,
 } from "react-icons/fi";
 import "./css/Dashboard.css";
+import { API_BASE_URL } from "../config/api";
 
-// Import all components
-import DashboardTab from "./DashboardTab";
-import ServicesTab from "./ServicesTab";
-import ClientsTab from "./ClientsTab";
-import ProductsTab from "./ProductsTab";
-import CardTab from "./CardTab";
-import PendingCallsTab from "./PendingCallsTab";
-import StaffTab from "./StaffsTab";
-import RevenueTab from "./RevenueTab";
-import InverterServiceTab from "./InverterServiceTab";
+const DashboardTab = lazy(() => import("./DashboardTab"));
+const ServicesTab = lazy(() => import("./ServicesTab"));
+const ClientsTab = lazy(() => import("./ClientsTab"));
+const ProductsTab = lazy(() => import("./ProductsTab"));
+const CardTab = lazy(() => import("./CardTab"));
+const PendingCallsTab = lazy(() => import("./PendingCallsTab"));
+const StaffTab = lazy(() => import("./StaffsTab"));
+const RevenueTab = lazy(() => import("./RevenueTab"));
+const InverterServiceTab = lazy(() => import("./InverterServiceTab"));
+const OverallReportTab = lazy(() => import("./OverallReportTab"));
+const BackupTab = lazy(() => import("./BackupTab"));
 
-// Import all modals
-import InverterServiceDetailModal from "./modals/InverterServiceDetailModal";
-import InverterServiceFormModal from "./modals/InverterServiceFormModal";
-import ServiceDetailModal from "./modals/ServiceDetailModal";
-import ServiceFormModal from "./modals/ServiceFormModal";
-import CustomerDetailModal from "./modals/CustomerDetailModal";
-import ProductFormModal from "./modals/ProductFormModal";
-import ProductDetailModal from "./modals/ProductDetailModal";
-import DeleteConfirmationModal from "./modals/DeleteConfirmationModal";
-import StaffFormModal from "./modals/StaffFormModal";
-import StaffDetailModal from "./modals/StaffDetailModal";
+const InverterServiceDetailModal = lazy(() => import("./modals/InverterServiceDetailModal"));
+const InverterServiceFormModal = lazy(() => import("./modals/InverterServiceFormModal"));
+const ServiceDetailModal = lazy(() => import("./modals/ServiceDetailModal"));
+const ServiceFormModal = lazy(() => import("./modals/ServiceFormModal"));
+const CustomerDetailModal = lazy(() => import("./modals/CustomerDetailModal"));
+const ProductFormModal = lazy(() => import("./modals/ProductFormModal"));
+const ProductDetailModal = lazy(() => import("./modals/ProductDetailModal"));
+const DeleteConfirmationModal = lazy(() => import("./modals/DeleteConfirmationModal"));
+const StaffFormModal = lazy(() => import("./modals/StaffFormModal"));
+const StaffDetailModal = lazy(() => import("./modals/StaffDetailModal"));
 import type {
   User,
   ServiceOrder,
@@ -67,6 +70,14 @@ interface NavItem {
   label: string;
   id: string;
   adminOnly?: boolean; // Add adminOnly flag
+}
+
+interface UiNotification {
+  id: number;
+  message: string;
+  type: 'created' | 'updated' | 'deleted' | 'info';
+  createdAt: string;
+  read: boolean;
 }
 
 // Sidebar Component with Pending Calls
@@ -95,9 +106,11 @@ const Sidebar: React.FC<SidebarProps> = ({
     { icon: <FiUsers />, label: 'New Account', id: 'customers', adminOnly: false },
     { icon: <FiBox />, label: 'AMC', id: 'products', adminOnly: false },
     { icon: <FiDollarSign />, label: 'Income and Expenses', id: 'revenue', adminOnly: false },
+    { icon: <FiBarChart2 />, label: 'Overall Report', id: 'overall_report', adminOnly: false },
     { icon: <FiCreditCard />, label: 'Service Call Completed', id: 'cards', adminOnly: false },
     { icon: <FiUserCheck />, label: 'Add New Staff', id: 'staff', adminOnly: true }, // Admin only
-    { icon: <FiPhoneCall />, label: 'Pending Service Calls', id: 'pending_calls', adminOnly: false }
+    { icon: <FiPhoneCall />, label: 'Pending Service Calls', id: 'pending_calls', adminOnly: false },
+    { icon: <FiDatabase />, label: 'Backup', id: 'backup', adminOnly: false }
   ]);
 
   // Filter nav items based on user role
@@ -416,6 +429,12 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
   const [activeTab, setActiveTab] = useState<string>("dashboard");
   const [showScrollTop, setShowScrollTop] = useState<boolean>(false);
   const [searchTerm, setSearchTerm] = useState<string>("");
+  const [showNotifications, setShowNotifications] = useState<boolean>(false);
+  const [notifications, setNotifications] = useState<UiNotification[]>([]);
+  const [selectedFinancialMonth, setSelectedFinancialMonth] = useState<string>(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  });
   const [showServiceForm, setShowServiceForm] = useState<boolean>(false);
   const [showInverterServiceForm, setShowInverterServiceForm] = useState<boolean>(false);
   const [showCustomerDetail, setShowCustomerDetail] = useState<boolean>(false);
@@ -576,6 +595,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
     customer_id: null as number | null,
     customer_phone: "",
     inverter_id: null as number | null,
+    inverter_ids: [] as number[],
     service_staff_id: null as number | null,
     issue_description: "",
     diagnostic_results: "",
@@ -598,10 +618,11 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
   });
   
   // API Base URL
-  const API_BASE_URL = "http://localhost/sun_office/api";
-  
   // Refs
   const dashboardContentRef = useRef<HTMLDivElement>(null);
+  const notificationRef = useRef<HTMLDivElement>(null);
+  const notificationIdRef = useRef<number>(1);
+  const lastNotifiedSuccessRef = useRef<string | null>(null);
   
   // Helper function to find battery by serial
   const findBatteryBySerial = (batterySerial: string): Battery | null => {
@@ -736,6 +757,47 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
       }
     };
   }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
+        setShowNotifications(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const addUiNotification = (message: string, type: 'created' | 'updated' | 'deleted' | 'info' = 'info') => {
+    const notification: UiNotification = {
+      id: notificationIdRef.current++,
+      message,
+      type,
+      createdAt: new Date().toISOString(),
+      read: false
+    };
+    setNotifications(prev => [notification, ...prev].slice(0, 30));
+  };
+
+  useEffect(() => {
+    if (!successMessage) return;
+    if (lastNotifiedSuccessRef.current === successMessage) return;
+    lastNotifiedSuccessRef.current = successMessage;
+
+    const lower = successMessage.toLowerCase();
+    let type: 'created' | 'updated' | 'deleted' | 'info' = 'info';
+    if (lower.includes('created') || lower.includes('added')) {
+      type = 'created';
+    } else if (lower.includes('updated') || lower.includes('edited')) {
+      type = 'updated';
+    } else if (lower.includes('deleted') || lower.includes('removed')) {
+      type = 'deleted';
+    }
+    addUiNotification(successMessage, type);
+  }, [successMessage]);
+
+  const unreadNotificationsCount = notifications.filter(n => !n.read).length;
   
   // Load data based on active tab
   useEffect(() => {
@@ -747,7 +809,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
         switch(activeTab) {
           case 'dashboard':
             await Promise.all([
-              loadDashboardData(),
+              loadDashboardData(selectedFinancialMonth),
               loadServices(),
               loadInverterServices()
             ]);
@@ -770,6 +832,13 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
           case 'revenue':
             await loadRevenueData();
             break;
+          case 'overall_report':
+            await Promise.all([
+              loadDashboardData(selectedFinancialMonth),
+              loadServices(),
+              loadInverterServices()
+            ]);
+            break;
           case 'cards':
             await loadServices();
             await loadInverterServices();
@@ -788,6 +857,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
               setTimeout(() => setError(null), 3000);
             }
             break;
+          case 'backup':
+            break;
           default:
             break;
         }
@@ -800,7 +871,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
     };
     
     loadData();
-  }, [activeTab, user.role]);
+  }, [activeTab, user.role, selectedFinancialMonth]);
   
   // Load pending calls count for badge
   const loadPendingCallsCount = async () => {
@@ -895,7 +966,25 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
       const data = await response.json();
       
       if (data.success && data.data) {
-        const formattedServices: InverterService[] = data.data.map((service: any) => ({
+        const resolveCreatedAt = (service: any): string =>
+          service.created_at ||
+          service.create_date ||
+          service.created_date ||
+          service.createdAt ||
+          service.date_created ||
+          '';
+
+        const resolveUpdatedAt = (service: any, createdAt: string): string =>
+          service.updated_at ||
+          service.updated_date ||
+          service.updatedAt ||
+          createdAt;
+
+        const formattedServices: InverterService[] = data.data.map((service: any) => {
+          const resolvedCreatedAt = resolveCreatedAt(service);
+          const resolvedUpdatedAt = resolveUpdatedAt(service, resolvedCreatedAt);
+
+          return ({
           id: parseInt(service.id),
           service_code: service.service_code || '',
           customer_id: parseInt(service.customer_id || '0'),
@@ -904,12 +993,16 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
           customer_email: service.customer_email || '',
           customer_address: service.customer_address || '',
           inverter_id: parseInt(service.inverter_id || '0'),
+          inverter_ids: Array.isArray(service.inverter_ids)
+            ? service.inverter_ids.map((id: any) => parseInt(id)).filter((id: number) => !isNaN(id) && id > 0)
+            : [],
           inverter_model: service.inverter_model || '',
           inverter_serial: service.inverter_serial || '',
           inverter_brand: service.inverter_brand || '',
           inverter_power_rating: service.inverter_power_rating || '',
           inverter_type: service.inverter_type || '',
           inverter_wave_type: service.inverter_wave_type || '',
+          inverters: Array.isArray(service.inverters) ? service.inverters : [],
           issue_description: service.issue_description || '',
           diagnostic_results: service.diagnostic_results || '',
           repair_description: service.repair_description || '',
@@ -925,13 +1018,14 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
           inverter_claim: service.inverter_claim || 'none',
           estimated_completion_date: service.estimated_completion_date || '',
           notes: service.notes || '',
-          created_at: service.created_at || '',
-          updated_at: service.updated_at || '',
+          created_at: resolvedCreatedAt,
+          updated_at: resolvedUpdatedAt,
           service_staff_id: parseInt(service.service_staff_id || '0'),
           staff_name: service.staff_name || '',
           staff_email: service.staff_email || '',
           service_type: 'inverter_service'
-        }));
+        });
+        });
         setInverterServices(formattedServices);
         setSuccessMessage('Inverter services loaded successfully!');
         setTimeout(() => setSuccessMessage(null), 3000);
@@ -1061,9 +1155,37 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
   };
   
   // Load dashboard data from API
-  const loadDashboardData = async () => {
+  const loadDashboardData = async (financialMonth?: string) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/dashboard_stats.php`, {
+      const monthValue = financialMonth || selectedFinancialMonth;
+      const [yy, mm] = monthValue.split('-');
+      let revenueSummaryForMonth: any = null;
+
+      try {
+        const revenueRes = await fetch(`${API_BASE_URL}/revenue.php?date_range=all&year=${yy || new Date().getFullYear()}&month=${mm || (new Date().getMonth() + 1)}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          }
+        });
+
+        if (revenueRes.ok) {
+          const revenueJson = await revenueRes.json();
+          if (revenueJson?.success && revenueJson?.summary?.overall) {
+            revenueSummaryForMonth = revenueJson.summary.overall;
+          }
+        }
+      } catch (err) {
+        console.error('Revenue summary fetch failed for dashboard financial sync:', err);
+      }
+
+      const params = new URLSearchParams();
+      if (yy && mm) {
+        params.append('year', yy);
+        params.append('month', mm);
+      }
+      const response = await fetch(`${API_BASE_URL}/dashboard_stats.php${params.toString() ? `?${params.toString()}` : ''}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -1087,10 +1209,18 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
           total_services: parseInt(data.data.total_services?.toString() || '0'),
           pending_services: parseInt(data.data.pending_services?.toString() || '0'),
           total_staff: parseInt(data.data.total_staff?.toString() || '0'),
-          monthly_revenue: parseFloat(data.data.monthly_revenue?.toString() || '0'),
-          monthly_expenses: parseFloat(data.data.monthly_expenses?.toString() || '0'),
-          monthly_salary: parseFloat(data.data.monthly_salary?.toString() || '0'),
-          monthly_profit: parseFloat(data.data.monthly_profit?.toString() || '0'),
+          monthly_revenue: revenueSummaryForMonth
+            ? parseFloat(revenueSummaryForMonth.total_income?.toString() || '0')
+            : parseFloat(data.data.monthly_revenue?.toString() || '0'),
+          monthly_expenses: revenueSummaryForMonth
+            ? parseFloat(revenueSummaryForMonth.total_expenses?.toString() || '0')
+            : parseFloat(data.data.monthly_expenses?.toString() || '0'),
+          monthly_salary: revenueSummaryForMonth
+            ? parseFloat(revenueSummaryForMonth.total_salaries?.toString() || '0')
+            : parseFloat(data.data.monthly_salary?.toString() || '0'),
+          monthly_profit: revenueSummaryForMonth
+            ? parseFloat(revenueSummaryForMonth.net_profit?.toString() || '0')
+            : parseFloat(data.data.monthly_profit?.toString() || '0'),
           battery_conditions: {
             excellent: data.data.battery_conditions?.excellent || 0,
             good: data.data.battery_conditions?.good || 0,
@@ -1197,6 +1327,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
           customer_id: parseInt(service.customer_id || '0'),
           customer_name: service.customer_name || '',
           customer_phone: service.customer_phone || '',
+          customer_alternate_phone: service.customer_alternate_phone || service.alternate_phone || '',
           customer_email: service.customer_email || '',
           customer_address: service.customer_address || '',
           battery_id: parseInt(service.battery_id || '0'),
@@ -1556,6 +1687,13 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
         case 'revenue':
           await loadRevenueData();
           break;
+        case 'overall_report':
+          await Promise.all([
+            loadDashboardData(selectedFinancialMonth),
+            loadServices(),
+            loadInverterServices()
+          ]);
+          break;
         case 'cards':
           await loadServices();
           await loadInverterServices();
@@ -1571,6 +1709,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
             setError('You do not have permission to access Staff Management');
             setTimeout(() => setError(null), 3000);
           }
+          break;
+        case 'backup':
           break;
         default:
           break;
@@ -1597,9 +1737,22 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
   };
   
   // Service handlers
+  const resolveCustomerAlternatePhone = (service: ServiceOrder) => {
+    const matchedCustomer = customers.find((customer) =>
+      (service.customer_id && customer.id === service.customer_id) ||
+      (service.customer_name && customer.full_name === service.customer_name) ||
+      (service.customer_phone && customer.phone === service.customer_phone)
+    );
+
+    return service.customer_alternate_phone || matchedCustomer?.alternate_phone || '';
+  };
+
   const handleViewService = (service: ServiceOrder) => {
     setShowServiceForm(false);
-    setSelectedService(service);
+    setSelectedService({
+      ...service,
+      customer_alternate_phone: resolveCustomerAlternatePhone(service),
+    });
   };
   
   const handleEditService = (service: ServiceOrder) => {
@@ -1665,6 +1818,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
       customer_id: service.customer_id || null,
       customer_phone: service.customer_phone || "",
       inverter_id: service.inverter_id || null,
+      inverter_ids: Array.isArray((service as any).inverter_ids) ? (service as any).inverter_ids : (service.inverter_id ? [service.inverter_id] : []),
       service_staff_id: service.service_staff_id || null,
       issue_description: service.issue_description || "",
       diagnostic_results: service.diagnostic_results || "",
@@ -1707,6 +1861,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
       customer_id: null,
       customer_phone: "",
       inverter_id: null,
+      inverter_ids: [],
       service_staff_id: null,
       issue_description: "",
       diagnostic_results: "",
@@ -1889,6 +2044,23 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
   // Inverter Service form handlers
   const handleInverterServiceInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
+    if (name === 'inverter_ids') {
+      let parsed: number[] = [];
+      try {
+        const raw = JSON.parse(value || '[]');
+        if (Array.isArray(raw)) {
+          parsed = raw.map((v: any) => parseInt(v)).filter((id: number) => !isNaN(id) && id > 0);
+        }
+      } catch {
+        parsed = [];
+      }
+      setInverterServiceForm(prev => ({
+        ...prev,
+        inverter_ids: parsed,
+        inverter_id: parsed[0] || null
+      }));
+      return;
+    }
     setInverterServiceForm(prev => ({
       ...prev,
       [name]: value
@@ -1910,6 +2082,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
         customer_id: inverterServiceForm.customer_id || "",
         customer_phone: inverterServiceForm.customer_phone || "",
         inverter_id: inverterServiceForm.inverter_id || "",
+        inverter_ids: Array.isArray((inverterServiceForm as any).inverter_ids) ? (inverterServiceForm as any).inverter_ids : [],
         service_staff_id: inverterServiceForm.service_staff_id || "",
         issue_description: inverterServiceForm.issue_description || "",
         diagnostic_results: inverterServiceForm.diagnostic_results || "",
@@ -2570,31 +2743,64 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
       
       const url = `${API_BASE_URL}/batteries.php`;
       const isEdit = selectedBattery !== null;
-      
+
       if (isEdit && selectedBattery) {
         batteryData.id = selectedBattery.id;
-      }
-      
-      const response = await fetch(url, {
-        method: isEdit ? 'PUT' : 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify(batteryData)
-      });
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        await loadBatteries();
-        setShowProductForm(false);
-        setSelectedBattery(null);
-        setSuccessMessage(isEdit ? 'Battery updated successfully!' : 'Battery added successfully!');
-        setTimeout(() => setSuccessMessage(null), 3000);
+
+        const response = await fetch(url, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify(batteryData)
+        });
+
+        const data = await response.json();
+        if (!data.success) {
+          throw new Error(data.message || 'Failed to update battery');
+        }
       } else {
-        throw new Error(data.message || 'Failed to save battery');
+        // Create separate battery records for each serial token.
+        // Supports new lines, spaces, tabs, and commas.
+        const serialNumbers = (batteryData.battery_serial || '')
+          .split(/[,\s]+/)
+          .map((serial: string) => serial.trim())
+          .filter((serial: string) => serial.length > 0);
+
+        const serialsToCreate = serialNumbers.length > 0 ? serialNumbers : [''];
+
+        for (const serial of serialsToCreate) {
+          const payload = {
+            ...batteryData,
+            battery_serial: serial
+          };
+
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify(payload)
+          });
+
+          const data = await response.json();
+          if (!data.success) {
+            throw new Error(data.message || `Failed to add battery for serial: ${serial || 'N/A'}`);
+          }
+        }
       }
+
+      await loadBatteries();
+      setShowProductForm(false);
+      setSelectedBattery(null);
+      setSuccessMessage(
+        isEdit
+          ? 'Battery updated successfully!'
+          : 'Battery records added successfully!'
+      );
+      setTimeout(() => setSuccessMessage(null), 3000);
       
     } catch (error: any) {
       console.error('Error saving battery:', error);
@@ -2612,8 +2818,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
       const url = `${API_BASE_URL}/inverters.php`;
       const isEdit = selectedInverter !== null;
       
-      // Prepare the data for API
-      const apiData: any = {
+      // Prepare base data for API
+      const baseApiData: any = {
         inverter_model: inverterData.inverter_model || "",
         inverter_brand: inverterData.inverter_brand || "",
         power_rating: inverterData.power_rating || "",
@@ -2629,50 +2835,78 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
         status: inverterData.status || "active",
         purchase_date: inverterData.purchase_date || null,
         installation_date: inverterData.installation_date || null,
-        inverter_condition: inverterData.inverter_condition || "good",
-        inverter_serial: inverterData.inverter_serial || ""
+        inverter_condition: inverterData.inverter_condition || "good"
       };
       
-      // Add ID for edit mode
       if (isEdit && selectedInverter) {
-        apiData.id = selectedInverter.id;
-      }
-      
-      console.log("Saving inverter data:", apiData);
-      console.log("Request URL:", url);
-      console.log("Request method:", isEdit ? 'PUT' : 'POST');
-      
-      const response = await fetch(url, {
-        method: isEdit ? 'PUT' : 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify(apiData)
-      });
-      
-      // Check if response is OK
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Error response:", errorText);
-        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
-      }
-      
-      const data = await response.json();
-      console.log("Inverter save response:", data);
-      
-      // Check for success in response
-      if (data && (data.success === true || data.success === "true" || data.success === 1)) {
-        await loadInverters(); // Reload inverters to get updated list
-        setShowProductForm(false);
-        setSelectedInverter(null);
-        setSuccessMessage(isEdit ? 'Inverter updated successfully!' : 'Inverter added successfully!');
-        setTimeout(() => setSuccessMessage(null), 3000);
+        const apiData = {
+          ...baseApiData,
+          id: selectedInverter.id,
+          inverter_serial: inverterData.inverter_serial || ""
+        };
+
+        const response = await fetch(url, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify(apiData)
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+        }
+
+        const data = await response.json();
+        if (!(data && (data.success === true || data.success === "true" || data.success === 1))) {
+          const errorMsg = data.message || data.error || 'Failed to update inverter';
+          throw new Error(errorMsg);
+        }
       } else {
-        // If success flag is false or missing
-        const errorMsg = data.message || data.error || 'Failed to save inverter';
-        throw new Error(errorMsg);
+        // Create separate inverter records for each serial token.
+        // Supports new lines, spaces, tabs, and commas.
+        const serialNumbers = (inverterData.inverter_serial || '')
+          .split(/[,\s]+/)
+          .map((serial: string) => serial.trim())
+          .filter((serial: string) => serial.length > 0);
+
+        const serialsToCreate = serialNumbers.length > 0 ? serialNumbers : [''];
+
+        for (const serial of serialsToCreate) {
+          const apiData = {
+            ...baseApiData,
+            inverter_serial: serial
+          };
+
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify(apiData)
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+          }
+
+          const data = await response.json();
+          if (!(data && (data.success === true || data.success === "true" || data.success === 1))) {
+            const errorMsg = data.message || data.error || `Failed to add inverter for serial: ${serial || 'N/A'}`;
+            throw new Error(errorMsg);
+          }
+        }
       }
+
+      await loadInverters(); // Reload inverters to get updated list
+      setShowProductForm(false);
+      setSelectedInverter(null);
+      setSuccessMessage(isEdit ? 'Inverter updated successfully!' : 'Inverter records added successfully!');
+      setTimeout(() => setSuccessMessage(null), 3000);
       
     } catch (error: any) {
       console.error('Error saving inverter:', error);
@@ -2759,6 +2993,23 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
     setShowCustomerDetail(false);
     setSelectedCustomer(null);
   };
+
+  useEffect(() => {
+    const warmUpHeavyTabs = () => {
+      void import("./ServicesTab");
+      void import("./ProductsTab");
+      void import("./RevenueTab");
+      void import("./OverallReportTab");
+    };
+
+    if ("requestIdleCallback" in window) {
+      const idleId = window.requestIdleCallback(warmUpHeavyTabs, { timeout: 2000 });
+      return () => window.cancelIdleCallback(idleId);
+    }
+
+    const timeoutId = globalThis.setTimeout(warmUpHeavyTabs, 1200);
+    return () => globalThis.clearTimeout(timeoutId);
+  }, []);
   
   return (
     <div className="dashboard">
@@ -2863,15 +3114,80 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
             >
               <FiRefreshCw className={loading ? 'spinning' : ''} />
             </motion.button>
-            <div className="notification-dropdown">
+            <div className="notification-dropdown" ref={notificationRef} style={{ position: 'relative' }}>
               <motion.button 
                 className="nav-btn notification-btn"
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
+                onClick={() => {
+                  const next = !showNotifications;
+                  setShowNotifications(next);
+                  if (next) {
+                    setNotifications(prev => prev.map(item => ({ ...item, read: true })));
+                  }
+                }}
               >
                 <FiBell />
-                <span className="notification-badge">3</span>
+                {unreadNotificationsCount > 0 && (
+                  <span className="notification-badge">{unreadNotificationsCount}</span>
+                )}
               </motion.button>
+              {showNotifications && (
+                <div style={{
+                  position: 'absolute',
+                  top: '44px',
+                  right: 0,
+                  width: '280px',
+                  background: '#fff',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '10px',
+                  boxShadow: '0 10px 25px rgba(0,0,0,0.12)',
+                  zIndex: 1000,
+                  overflow: 'hidden'
+                }}>
+                  <div style={{ padding: '10px 12px', borderBottom: '1px solid #f1f5f9', fontWeight: 600, color: '#111827' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                      <span>Notifications</span>
+                      <button
+                        onClick={() => setNotifications([])}
+                        style={{
+                          border: '1px solid #e5e7eb',
+                          backgroundColor: '#fff',
+                          color: '#374151',
+                          borderRadius: '6px',
+                          padding: '4px 8px',
+                          fontSize: '11px',
+                          fontWeight: 600,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+                  {notifications.length === 0 ? (
+                    <div style={{ padding: '10px 12px', fontSize: '13px', color: '#6b7280' }}>
+                      No notifications yet.
+                    </div>
+                  ) : (
+                    notifications.map((item) => (
+                      <div key={item.id} style={{
+                        padding: '10px 12px',
+                        fontSize: '13px',
+                        color: '#374151',
+                        borderBottom: '1px solid #f8fafc',
+                        backgroundColor:
+                          item.type === 'created' ? '#ecfdf5' :
+                          item.type === 'updated' ? '#eff6ff' :
+                          item.type === 'deleted' ? '#fef2f2' : '#ffffff'
+                      }}>
+                        <div style={{ fontWeight: 600, marginBottom: '2px', textTransform: 'capitalize' }}>{item.type}</div>
+                        <div>{item.message}</div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
             <div className="user-menu">
               <div className="user-avatar-placeholder" style={{ background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)' }}>
@@ -2990,6 +3306,15 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
               <p>Loading data from database...</p>
             </div>
           )}
+
+          <Suspense
+            fallback={
+              <div className="loading-state">
+                <div className="loading-spinner"></div>
+                <p>Loading section...</p>
+              </div>
+            }
+          >
 
           {/* Staff Form Modal - Only accessible to admin */}
           {user.role?.toLowerCase() === 'admin' && (
@@ -3195,6 +3520,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
           {activeTab === 'dashboard' && (
             <DashboardTab
               dashboardStats={dashboardStats}
+              selectedFinancialMonth={selectedFinancialMonth}
+              onFinancialMonthChange={setSelectedFinancialMonth}
               recentServices={recentServices.slice(0, 5)}
               activities={activities}
               getStatusColor={getStatusColor}
@@ -3213,6 +3540,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
             <ServicesTab
               services={filteredServices}
               filteredServices={filteredServices}
+              customers={customers}
               filterStatus={filterStatus}
               filterPriority={filterPriority}
               filterClaimType={filterClaimType}
@@ -3253,6 +3581,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
           {activeTab === 'cards' && (
             <CardTab
               services={[...filteredServices, ...filteredInverterServices] as ServiceOrder[]}
+              customers={customers}
               loading={loading}
               error={error}
               onRefresh={handleRefresh}
@@ -3281,6 +3610,16 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
             />
           )}
 
+          {activeTab === 'overall_report' && (
+            <OverallReportTab
+              services={[...services, ...inverterServices] as ServiceOrder[]}
+              dashboardStats={dashboardStats}
+              selectedMonth={selectedFinancialMonth}
+              onMonthChange={setSelectedFinancialMonth}
+              loading={loading}
+            />
+          )}
+
           {/* Clients Management Tab */}
           {activeTab === 'customers' && (
             <ClientsTab
@@ -3289,6 +3628,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
               onEditCustomer={handleEditCustomer}
               onDeleteCustomer={handleDeleteCustomer}
               onNewCustomer={handleNewCustomer}
+              onRefreshCustomers={loadCustomers}
               onSaveCustomer={handleCustomerSave}
               loading={loading}
               showSnackbar={showSnackbar}
@@ -3397,6 +3737,15 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
               onSearchChange={setSearchTerm}
             />
           )}
+
+          {/* Backup Tab */}
+          {activeTab === 'backup' && (
+            <BackupTab
+              apiBaseUrl={API_BASE_URL}
+              showSnackbar={showSnackbar}
+            />
+          )}
+          </Suspense>
 
           {/* Scroll to Top Button */}
           <AnimatePresence>

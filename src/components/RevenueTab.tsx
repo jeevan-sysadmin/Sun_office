@@ -22,6 +22,7 @@ import {
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import "./css/Revenue.css";
+import { API_BASE_URL } from "../config/api";
 
 // Type Definitions
 interface RevenueFilters {
@@ -205,9 +206,9 @@ const RevenueTab: React.FC<RevenueTabProps> = ({
 }) => {
   // State
   const [revenueData, setRevenueData] = useState<RevenueResponse | null>(null);
-  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+  const [selectedYear, setSelectedYear] = useState<number | null>(2026);
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
-  const [dateRange, setDateRange] = useState<DateRangeOption>('this_month');
+  const [dateRange, setDateRange] = useState<DateRangeOption>('all');
   const [customFromDate, setCustomFromDate] = useState<string>('');
   const [customToDate, setCustomToDate] = useState<string>('');
   const [showCustomDatePicker, setShowCustomDatePicker] = useState<boolean>(false);
@@ -232,13 +233,8 @@ const RevenueTab: React.FC<RevenueTabProps> = ({
   const isLoadingRef = useRef(false);
 
   // API Base URL
-  const API_BASE_URL = "http://localhost/sun_office/api";
-
-  // Available years (generate from 2020 to current year + 1)
-  const availableYears = Array.from(
-    { length: new Date().getFullYear() - 2020 + 2 },
-    (_, i) => 2020 + i
-  );
+  // Available years
+  const availableYears = [2026];
 
   // Month names
   const monthNames = [
@@ -248,7 +244,7 @@ const RevenueTab: React.FC<RevenueTabProps> = ({
 
   // Date range options for dropdown
   const dateRangeOptions = [
-    { value: 'all', label: 'All Dates' },
+    { value: 'all', label: 'None' },
     { value: 'today', label: 'Today' },
     { value: 'this_week', label: 'This Week' },
     { value: 'this_month', label: 'This Month' },
@@ -324,7 +320,6 @@ const RevenueTab: React.FC<RevenueTabProps> = ({
 
       case 'all':
       default:
-        // For 'all', we'll just pass year parameter
         break;
     }
 
@@ -335,8 +330,8 @@ const RevenueTab: React.FC<RevenueTabProps> = ({
   const getDateRangeParams = useCallback(() => {
     const params: any = {};
     
-    // Always include year
-    params.year = selectedYear;
+    // Always include year for month-wise filtering
+    params.year = selectedYear || 2026;
     
     // Include month if selected
     if (selectedMonth) {
@@ -444,8 +439,9 @@ const RevenueTab: React.FC<RevenueTabProps> = ({
 
   // Handle year change
   const handleYearChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newYear = parseInt(e.target.value);
-    setSelectedYear(newYear);
+    const raw = e.target.value;
+    const newYear = parseInt(raw, 10);
+    setSelectedYear(Number.isNaN(newYear) ? 2026 : newYear);
   };
 
   // Handle month change
@@ -3812,7 +3808,7 @@ const RevenueTab: React.FC<RevenueTabProps> = ({
               minWidth: isMobile ? '40px' : 'auto'
             }}>Year:</label>
             <select 
-              value={selectedYear} 
+              value={selectedYear ?? ''} 
               onChange={handleYearChange}
               className="filter-select"
               style={{

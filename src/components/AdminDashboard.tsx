@@ -27,6 +27,7 @@ import './css/AdminDashboard.css';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import autoTable from 'jspdf-autotable';
+import { API_BASE_URL } from '../config/api';
 
 // Enhanced Type Definitions
 interface User {
@@ -1105,8 +1106,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   });
   
   // API Configuration
-  const API_BASE_URL = "http://10.234.101.33/sun_computers/api";
-  
   // Check authentication and role
   useEffect(() => {
     const checkAuth = () => {

@@ -55,6 +55,8 @@ interface DashboardStats {
 
 interface DashboardTabProps {
   dashboardStats: DashboardStats;
+  selectedFinancialMonth?: string;
+  onFinancialMonthChange?: (month: string) => void;
   recentServices?: any[];
   activities?: any[];
   getStatusColor?: (status: string) => string;
@@ -69,6 +71,8 @@ interface DashboardTabProps {
 
 const DashboardTab: React.FC<DashboardTabProps> = ({
   dashboardStats,
+  selectedFinancialMonth = '',
+  onFinancialMonthChange,
   loading
 }) => {
   // State for current date and time
@@ -351,6 +355,20 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
         <div className="section-title">
           <h2>Financial Overview</h2>
           <p>Monthly financial statistics</p>
+        </div>
+        <div>
+          <input
+            type="month"
+            value={selectedFinancialMonth}
+            onChange={(e) => onFinancialMonthChange?.(e.target.value)}
+            style={{
+              border: '1px solid #d1d5db',
+              borderRadius: '8px',
+              padding: '8px 10px',
+              fontSize: '14px',
+              backgroundColor: '#fff'
+            }}
+          />
         </div>
       </div>
       

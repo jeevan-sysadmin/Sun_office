@@ -25,7 +25,7 @@ import {
 } from "react-icons/fi";
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import type { ServiceOrder } from "./types";
+import type { Customer, ServiceOrder } from "./types";
 import {
   badgeToneForStatus,
   formatReceiptLabel,
@@ -41,6 +41,7 @@ const MotionTr = motion.tr;
 interface ServicesTabProps {
   services: ServiceOrder[];
   filteredServices: ServiceOrder[];
+  customers: Customer[];
   filterStatus: string;
   filterPriority: string;
   filterClaimType: string;
@@ -60,6 +61,7 @@ interface ServicesTabProps {
 const ServicesTab: React.FC<ServicesTabProps> = ({
   services,
   filteredServices,
+  customers,
   filterStatus,
   filterPriority,
   filterClaimType,
@@ -108,6 +110,16 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
   // Check if mobile view
   const isMobile = windowWidth < 768;
   const isTablet = windowWidth >= 768 && windowWidth < 1024;
+
+  const getAlternatePhone = (service: ServiceOrder): string => {
+    const matchedCustomer = customers.find((customer) =>
+      (service.customer_id && customer.id === service.customer_id) ||
+      (service.customer_name && customer.full_name === service.customer_name) ||
+      (service.customer_phone && customer.phone === service.customer_phone)
+    );
+
+    return service.customer_alternate_phone || matchedCustomer?.alternate_phone || '';
+  };
 
   // Update last refreshed when data changes
   useEffect(() => {
@@ -220,6 +232,7 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
         (service.service_code && service.service_code.toLowerCase().includes(searchLower)) ||
         (service.customer_name && service.customer_name.toLowerCase().includes(searchLower)) ||
         (service.customer_phone && service.customer_phone.includes(searchTerm)) ||
+        (getAlternatePhone(service) && getAlternatePhone(service).includes(searchTerm)) ||
         (service.battery_model && service.battery_model.toLowerCase().includes(searchLower)) ||
         (service.battery_serial && service.battery_serial.toLowerCase().includes(searchLower)) || // Added battery serial search
         (service.inverter_model && service.inverter_model.toLowerCase().includes(searchLower)) ||
@@ -428,6 +441,7 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
           fields: [
             { label: "Customer Name", value: service.customer_name },
             { label: "Phone Number", value: service.customer_phone },
+            { label: "Alternate Phone", value: getAlternatePhone(service) || null },
             { label: "Email Address", value: service.customer_email || null },
             {
               label: "Address",
@@ -561,6 +575,7 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
                 <th>Email</th>
                 <th>Address</th>
                 <th>Phone</th>
+                <th>Alternate Phone</th>
                 <th>Battery IDs</th>
                 <th>Batteries</th>
                 <th>Inverter IDs</th>
@@ -599,6 +614,7 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
                     <td>${(service as any).customer_email || ''}</td>
                     <td>${(service as any).customer_address || ''}</td>
                     <td>${service.customer_phone || ''}</td>
+                    <td>${getAlternatePhone(service) || ''}</td>
                     <td>${batteryIds || '-'}</td>
                     <td>${batteryText}</td>
                     <td>${inverterIds || '-'}</td>
@@ -658,6 +674,7 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
         'Customer Email',
         'Customer Address',
         'Customer Phone',
+        'Alternate Phone',
         'Battery Count',
         'Battery Names',
         'Battery Models (All)',
@@ -767,6 +784,7 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
           `"${((service as any).customer_email || '').replace(/"/g, '""')}"`,
           `"${((service as any).customer_address || '').replace(/"/g, '""')}"`,
           `"${(service.customer_phone || '').replace(/"/g, '""')}"`,
+          `"${(getAlternatePhone(service) || '').replace(/"/g, '""')}"`,
           `"${String(allBatteries.length)}"`,
           `"${batteryModels.replace(/"/g, '""')}"`,
           `"${batteryModels.replace(/"/g, '""')}"`,
@@ -900,6 +918,7 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
         'Service Code',
         'Customer',
         'Phone',
+        'Alternate Phone',
         'Batteries',
         'Inverters',
         'Status',
@@ -919,6 +938,7 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
           service.service_code || '',
           service.customer_name || '',
           service.customer_phone || '',
+          getAlternatePhone(service) || '',
           batteryText,
           inverterText,
           formatReceiptLabel((service as any).status) || 'Pending',
@@ -1208,6 +1228,11 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
           <div style={{ fontSize: '12px', color: '#6b7280', display: 'flex', alignItems: 'center', gap: '4px' }}>
             <FiPhone size={10} /> {service.customer_phone}
           </div>
+          {getAlternatePhone(service) && (
+            <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px' }}>
+              Alt: {getAlternatePhone(service)}
+            </div>
+          )}
         </div>
         <div>
           <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '4px' }}>Equipment</div>
@@ -2156,6 +2181,11 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
                             <div style={{ fontSize: isTablet ? '11px' : '12px', color: '#6b7280', display: 'flex', alignItems: 'center', gap: '4px' }}>
                               <FiPhone size={isTablet ? 9 : 10} /> {service.customer_phone}
                             </div>
+                            {getAlternatePhone(service) && (
+                              <div style={{ fontSize: isTablet ? '10px' : '11px', color: '#94a3b8', marginTop: '4px' }}>
+                                Alt: {getAlternatePhone(service)}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </td>

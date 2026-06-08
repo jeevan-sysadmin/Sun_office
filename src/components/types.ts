@@ -35,6 +35,7 @@ export interface ServiceOrder {
   customer_name: string;
   customer_email?: string;
   customer_phone: string;
+  customer_alternate_phone?: string;
   customer_address?: string;
   battery_id: number | null;
   battery_ids?: number[];
@@ -145,6 +146,7 @@ export interface InverterService {
   customer_state?: string;
   customer_zip?: string;
   inverter_id: number;
+  inverter_ids?: number[];
   inverter_model: string;
   inverter_serial: string;
   inverter_brand: string;
@@ -173,6 +175,15 @@ export interface InverterService {
   staff_name?: string;
   staff_email?: string;
   service_type: string;
+  inverters?: Array<{
+    id: number;
+    inverter_model?: string;
+    inverter_serial?: string;
+    inverter_brand?: string;
+    power_rating?: string;
+    wave_type?: string;
+    battery_voltage?: string;
+  }>;
 }
 
 export interface Customer {

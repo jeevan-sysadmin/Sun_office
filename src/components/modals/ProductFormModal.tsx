@@ -168,10 +168,10 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
   
   // Refs for input fields
   const batteryModelRef = useRef<HTMLInputElement>(null);
-  const batterySerialRef = useRef<HTMLInputElement>(null);
+  const batterySerialRef = useRef<HTMLTextAreaElement>(null);
   const batteryBrandRef = useRef<HTMLInputElement>(null);
   const inverterModelRef = useRef<HTMLInputElement>(null);
-  const inverterSerialRef = useRef<HTMLInputElement>(null);
+  const inverterSerialRef = useRef<HTMLTextAreaElement>(null);
   const inverterBrandRef = useRef<HTMLInputElement>(null);
   const hiddenBarcodeInputRef = useRef<HTMLInputElement>(null);
 
@@ -1003,16 +1003,16 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
                   fontWeight: 600,
                   fontSize: isMobile ? '14px' : '0.875rem'
                 }}>
-                  <FiPackage size={isMobile ? 16 : 14} /> Serial Number
+                  <FiPackage size={isMobile ? 16 : 14} /> Serial Number(s)
                 </label>
-                <input
+                <textarea
                   ref={batterySerialRef}
-                  type="text"
                   name="battery_serial"
                   value={batteryFormData.battery_serial}
                   onChange={handleBatteryChange}
-                  placeholder="Enter serial number or scan barcode"
+                  placeholder={"Enter serial numbers separated by space / new line / comma\nExample:\n125301 125302 125303\nor\n125301\n125302\n125303"}
                   disabled={isFormLoading}
+                  rows={isMobile ? 5 : 4}
                   style={{
                     width: '100%',
                     padding: isMobile ? '14px 16px' : '12px 14px',
@@ -1022,11 +1022,16 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     opacity: isFormLoading ? 0.7 : 1,
                     outline: 'none',
                     transition: 'all 0.2s',
-                    backgroundColor: isScanning ? '#f0fdf4' : 'white'
+                    backgroundColor: isScanning ? '#f0fdf4' : 'white',
+                    resize: 'vertical',
+                    fontFamily: 'inherit'
                   }}
                   onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
                   onBlur={(e) => e.target.style.borderColor = errors.battery_serial ? '#ef4444' : '#e5e7eb'}
                 />
+                <small style={{ color: '#6b7280', fontSize: isMobile ? '11px' : '12px', marginTop: '6px', display: 'block' }}>
+                  Each serial number will be created as a separate battery record.
+                </small>
                 {errors.battery_serial && <span style={{ color: '#ef4444', fontSize: isMobile ? '12px' : '0.75rem', marginTop: '6px', display: 'block' }}>{errors.battery_serial}</span>}
               </div>
 
@@ -1505,14 +1510,14 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 }}>
                   <FiHash size={isMobile ? 16 : 14} /> Serial Number
                 </label>
-                <input
+                <textarea
                   ref={inverterSerialRef}
-                  type="text"
                   name="inverter_serial"
                   value={inverterFormData.inverter_serial}
                   onChange={handleInverterChange}
-                  placeholder="Enter serial number or scan barcode"
+                  placeholder={"Enter serial numbers separated by space / new line / comma\nExample:\nINV001 INV002 INV003\nor\nINV001\nINV002\nINV003"}
                   disabled={isFormLoading}
+                  rows={isMobile ? 5 : 4}
                   style={{
                     width: '100%',
                     padding: isMobile ? '14px 16px' : '12px 14px',
@@ -1522,11 +1527,16 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     opacity: isFormLoading ? 0.7 : 1,
                     outline: 'none',
                     transition: 'all 0.2s',
-                    backgroundColor: isScanning ? '#f0fdf4' : 'white'
+                    backgroundColor: isScanning ? '#f0fdf4' : 'white',
+                    resize: 'vertical',
+                    fontFamily: 'inherit'
                   }}
                   onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
                   onBlur={(e) => e.target.style.borderColor = errors.inverter_serial ? '#ef4444' : '#e5e7eb'}
                 />
+                <small style={{ color: '#6b7280', fontSize: isMobile ? '11px' : '12px', marginTop: '6px', display: 'block' }}>
+                  Each serial number will be created as a separate inverter record.
+                </small>
                 {errors.inverter_serial && <span style={{ color: '#ef4444', fontSize: isMobile ? '12px' : '0.75rem', marginTop: '6px', display: 'block' }}>{errors.inverter_serial}</span>}
               </div>
 

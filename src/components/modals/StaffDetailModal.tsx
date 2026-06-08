@@ -34,6 +34,7 @@ import {
   useTheme,
   useMediaQuery
 } from '@mui/material';
+import { API_BASE_URL } from "../../config/api";
 import Grid from '@mui/material/GridLegacy';
 import {
   Close as CloseIcon,
@@ -366,6 +367,18 @@ interface Expense {
   updated_at: string;
 }
 
+interface WaterPayment {
+  id: number;
+  service_id: number;
+  amount: number;
+  service_date: string;
+  notes: string;
+  service_staff_id?: number | null;
+  service_staff_name?: string | null;
+  service_code?: string;
+  customer_name?: string;
+}
+
 interface StaffDetailModalProps {
   open: boolean;
   onClose: () => void;
@@ -373,8 +386,6 @@ interface StaffDetailModalProps {
   onEdit?: () => void;
   onRefresh?: () => void;
 }
-
-const API_BASE_URL = "http://localhost/sun_office/api";
 
 const StaffDetailModal: React.FC<StaffDetailModalProps> = ({
   open,
@@ -397,6 +408,11 @@ const StaffDetailModal: React.FC<StaffDetailModalProps> = ({
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [snackbarType, setSnackbarType] = useState<'success' | 'error' | 'info'>('success');
+  const [waterPayments, setWaterPayments] = useState<WaterPayment[]>([]);
+  const [waterLoading, setWaterLoading] = useState(false);
+  const [waterYearlyTotal, setWaterYearlyTotal] = useState(0);
+  const [waterYearlyCount, setWaterYearlyCount] = useState(0);
 
   // Get month name from month number
   const getMonthName = (monthNumber: number): string => {
@@ -446,6 +462,12 @@ const StaffDetailModal: React.FC<StaffDetailModalProps> = ({
       loadStaffData();
     }
   }, [open, staff]);
+
+  useEffect(() => {
+    if (open && staff) {
+      loadWaterPayments();
+    }
+  }, [open, staff, selectedYear, selectedMonth]);
 
   const loadStaffData = async () => {
     if (!staff) return;
@@ -569,23 +591,108 @@ const StaffDetailModal: React.FC<StaffDetailModalProps> = ({
     }
   };
 
+  const getSalaryMonthKey = (salary: Salary): string => {
+    if (salary.salary_date) {
+      const d = new Date(salary.salary_date);
+      if (!isNaN(d.getTime())) {
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      }
+    }
+    return salary.salary_month || '';
+  };
+
+  const loadWaterPayments = async () => {
+    if (!staff) return;
+
+    setWaterLoading(true);
+    try {
+      const month = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
+      const response = await fetch(`${API_BASE_URL}/water_services.php?action=staff_monthly_summary&month=${month}`, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to load water payments: ${response.status}`);
+      }
+
+      const data = await response.json();
+      if (data.success) {
+        const list: WaterPayment[] = (data.payments || []).map((p: any) => ({
+          id: parseInt(p.id, 10),
+          service_id: parseInt(p.service_id, 10),
+          amount: parseFloat(p.amount) || 0,
+          service_date: p.service_date || '',
+          notes: p.notes || '',
+          service_staff_id: p.service_staff_id ? parseInt(p.service_staff_id, 10) : null,
+          service_staff_name: p.service_staff_name || null,
+          service_code: p.service_code || '',
+          customer_name: p.customer_name || ''
+        }));
+
+        const filtered = list.filter((p) =>
+          (p.service_staff_id && p.service_staff_id === staff.id) ||
+          (p.service_staff_name && p.service_staff_name.toLowerCase() === staff.name.toLowerCase())
+        );
+        setWaterPayments(filtered);
+      } else {
+        setWaterPayments([]);
+      }
+
+      // Year-wise total amount and count for this staff profile
+      const yearlyResponse = await fetch(`${API_BASE_URL}/water_services.php`, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' }
+      });
+
+      if (yearlyResponse.ok) {
+        const yearlyData = await yearlyResponse.json();
+        const yearlyRecords = Array.isArray(yearlyData.records) ? yearlyData.records : [];
+        const yearlyFiltered = yearlyRecords.filter((p: any) => {
+          const staffMatch =
+            (p.service_staff_id && parseInt(p.service_staff_id, 10) === staff.id) ||
+            (p.service_staff_name && String(p.service_staff_name).toLowerCase() === staff.name.toLowerCase());
+
+          if (!staffMatch || !p.service_date) return false;
+          const d = new Date(p.service_date);
+          return d.getFullYear().toString() === selectedYear;
+        });
+
+        const yearTotal = yearlyFiltered.reduce((sum: number, p: any) => sum + (parseFloat(p.amount) || 0), 0);
+        setWaterYearlyTotal(yearTotal);
+        setWaterYearlyCount(yearlyFiltered.length);
+      } else {
+        setWaterYearlyTotal(0);
+        setWaterYearlyCount(0);
+      }
+    } catch (err) {
+      console.error('Error loading water payments:', err);
+      setWaterPayments([]);
+      setWaterYearlyTotal(0);
+      setWaterYearlyCount(0);
+    } finally {
+      setWaterLoading(false);
+    }
+  };
+
   const handleRefresh = async () => {
     await loadStaffData();
     if (onRefresh) onRefresh();
-    showSnackbar('Data refreshed successfully!');
+    showSnackbar('Data refreshed successfully.', 'success');
   };
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
   };
 
-  // Get available years from salary data
+  // Get available years from salary/expense data
   const getAvailableYears = (): string[] => {
     const years = new Set<string>();
     salaries.forEach(s => {
-      if (s.salary_month) {
-        const [year] = s.salary_month.split('-');
-        years.add(year);
+      const monthKey = getSalaryMonthKey(s);
+      if (monthKey) {
+        const [year] = monthKey.split('-');
+        if (year) years.add(year);
       }
     });
     expenses.forEach(e => {
@@ -595,43 +702,27 @@ const StaffDetailModal: React.FC<StaffDetailModalProps> = ({
       }
     });
     
-    // If no data, use current year
+    // Always include current year for reliable month-wise filtering
+    years.add(new Date().getFullYear().toString());
+
+    // Also keep a recent range available so month-wise filter is never blocked
+    const currentYear = new Date().getFullYear();
+    years.add((currentYear - 1).toString());
+    years.add((currentYear - 2).toString());
+
+    // If no data at all, still keep at least recent years
     if (years.size === 0) {
-      years.add(new Date().getFullYear().toString());
+      years.add(currentYear.toString());
+      years.add((currentYear - 1).toString());
+      years.add((currentYear - 2).toString());
     }
     
     return Array.from(years).sort((a, b) => parseInt(b) - parseInt(a));
   };
 
-  // Get available months from salary data for selected year
+  // Month-wise filter should always allow all 12 months
   const getAvailableMonths = (): number[] => {
-    const months = new Set<number>();
-    
-    salaries.forEach(s => {
-      if (s.salary_month) {
-        const [year, month] = s.salary_month.split('-');
-        if (year === selectedYear) {
-          months.add(parseInt(month));
-        }
-      }
-    });
-    
-    expenses.forEach(e => {
-      if (e.expense_date) {
-        const date = new Date(e.expense_date);
-        const year = date.getFullYear().toString();
-        if (year === selectedYear) {
-          months.add(date.getMonth() + 1);
-        }
-      }
-    });
-    
-    // If no data, show current month
-    if (months.size === 0) {
-      months.add(new Date().getMonth() + 1);
-    }
-    
-    return Array.from(months).sort((a, b) => a - b);
+    return Array.from({ length: 12 }, (_, i) => i + 1);
   };
 
   // Filter salaries by selected year, month, and service type
@@ -643,9 +734,10 @@ const StaffDetailModal: React.FC<StaffDetailModalProps> = ({
       }
     }
     
-    // Parse the salary_month (format: "YYYY-MM")
-    if (s.salary_month) {
-      const [year, month] = s.salary_month.split('-');
+    // Month/year should follow paid date month first (fallback salary_month)
+    const monthKey = getSalaryMonthKey(s);
+    if (monthKey) {
+      const [year, month] = monthKey.split('-');
       const parsedMonth = parseInt(month, 10);
       return parsedMonth === selectedMonth && year === selectedYear;
     }
@@ -686,9 +778,12 @@ const StaffDetailModal: React.FC<StaffDetailModalProps> = ({
   };
 
   const totals = calculateTotals();
+  const totalWaterAmount = waterPayments.reduce((sum, p) => sum + p.amount, 0);
+  const totalWaterCount = waterPayments.length;
 
-  const showSnackbar = (message: string) => {
+  const showSnackbar = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
     setSnackbarMessage(message);
+    setSnackbarType(type);
     setSnackbarOpen(true);
     setTimeout(() => setSnackbarOpen(false), 3000);
   };
@@ -741,7 +836,7 @@ const StaffDetailModal: React.FC<StaffDetailModalProps> = ({
     link.click();
     URL.revokeObjectURL(url);
     
-    showSnackbar('CSV downloaded successfully!');
+    showSnackbar('CSV downloaded successfully.', 'success');
   };
 
   // Download PDF
@@ -922,7 +1017,7 @@ const StaffDetailModal: React.FC<StaffDetailModalProps> = ({
     }
 
     doc.save(`${staff.name.replace(/\s+/g, '_')}_report.pdf`);
-    showSnackbar('PDF downloaded successfully!');
+    showSnackbar('PDF downloaded successfully.', 'success');
   };
 
   // Print
@@ -1135,7 +1230,7 @@ const StaffDetailModal: React.FC<StaffDetailModalProps> = ({
     printWindow.focus();
     printWindow.print();
     
-    showSnackbar('Print dialog opened!');
+    showSnackbar('Print dialog opened.', 'info');
   };
 
   if (!staff) return null;
@@ -1212,7 +1307,7 @@ const StaffDetailModal: React.FC<StaffDetailModalProps> = ({
         onClose={() => setSnackbarOpen(false)}
         sx={{
           '& .MuiSnackbarContent-root': {
-            bgcolor: '#10b981',
+            bgcolor: snackbarType === 'success' ? '#10b981' : snackbarType === 'error' ? '#ef4444' : '#3b82f6',
             borderRadius: 2,
             fontWeight: 600,
             fontSize: isMobile ? '0.85rem' : '0.9rem'
@@ -2057,6 +2152,11 @@ const StaffDetailModal: React.FC<StaffDetailModalProps> = ({
               iconPosition="start"
               label={isMobile ? "Expenses" : "Expense History"}
             />
+            <StyledTab
+              icon={<WaterDropIcon sx={{ fontSize: isMobile ? 16 : 20 }} />}
+              iconPosition="start"
+              label={isMobile ? "Water" : "Water Payments"}
+            />
           </Tabs>
 
           {/* Salary History Tab */}
@@ -2100,6 +2200,7 @@ const StaffDetailModal: React.FC<StaffDetailModalProps> = ({
                           <TableRow>
                             {!isMobile && <StyledTableCell className="header">Service</StyledTableCell>}
                             <StyledTableCell className="header">Month</StyledTableCell>
+                            <StyledTableCell className="header">Paid Date</StyledTableCell>
                             {!isMobile && (
                               <>
                                 <StyledTableCell className="header" align="right">Base</StyledTableCell>
@@ -2119,7 +2220,7 @@ const StaffDetailModal: React.FC<StaffDetailModalProps> = ({
                         </TableHead>
                         <TableBody>
                           {filteredSalaries.map((salary, index) => {
-                            const formattedMonth = formatSalaryMonth(salary.salary_month);
+                            const formattedMonth = formatSalaryMonth(getSalaryMonthKey(salary));
                             return (
                               <TableRow
                                 key={salary.id}
@@ -2147,6 +2248,14 @@ const StaffDetailModal: React.FC<StaffDetailModalProps> = ({
                                     <CalendarTodayIcon sx={{ color: '#9CA3AF', fontSize: isMobile ? 12 : 14 }} />
                                     <Typography variant="body2" fontWeight="500">
                                       {formattedMonth}
+                                    </Typography>
+                                  </Box>
+                                </TableCell>
+                                <TableCell>
+                                  <Box display="flex" alignItems="center" gap={0.5}>
+                                    <AccessTimeIcon sx={{ color: '#9CA3AF', fontSize: isMobile ? 12 : 14 }} />
+                                    <Typography variant="body2" fontWeight="500">
+                                      {formatDate(salary.salary_date)}
                                     </Typography>
                                   </Box>
                                 </TableCell>
@@ -2331,6 +2440,131 @@ const StaffDetailModal: React.FC<StaffDetailModalProps> = ({
                         </TableBody>
                       </Table>
                     </TableContainer>
+                  )}
+                </div>
+              </Fade>
+            )}
+
+            {/* Water Payments Tab */}
+            {tabValue === 2 && (
+              <Fade in={tabValue === 2} timeout={500}>
+                <div>
+                  {waterLoading ? (
+                    <Box sx={{ p: isMobile ? 3 : 4, textAlign: 'center' }}>
+                      <CircularProgress size={isMobile ? 36 : 48} sx={{ color: '#1976d2' }} />
+                      <Typography variant="body2" color="textSecondary" sx={{ mt: 2 }}>
+                        Loading water payment history...
+                      </Typography>
+                    </Box>
+                  ) : (
+                    <>
+                      <Box sx={{
+                        display: 'grid',
+                        gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, minmax(0, 1fr))',
+                        gap: 2,
+                        mb: 2
+                      }}>
+                        <Card sx={{ borderRadius: 2, border: '1px solid', borderColor: alpha('#1976d2', 0.2) }}>
+                          <CardContent>
+                            <Typography variant="body2" color="textSecondary">Month Service Count</Typography>
+                            <Typography variant="h6" fontWeight={700} color="#1976d2">{totalWaterCount}</Typography>
+                          </CardContent>
+                        </Card>
+                        <Card sx={{ borderRadius: 2, border: '1px solid', borderColor: alpha('#10b981', 0.2) }}>
+                          <CardContent>
+                            <Typography variant="body2" color="textSecondary">Month Total Amount</Typography>
+                            <Typography variant="h6" fontWeight={700} color="#10b981">{formatCurrency(totalWaterAmount)}</Typography>
+                          </CardContent>
+                        </Card>
+                        <Card sx={{ borderRadius: 2, border: '1px solid', borderColor: alpha('#7c3aed', 0.2) }}>
+                          <CardContent>
+                            <Typography variant="body2" color="textSecondary">Year Service Count</Typography>
+                            <Typography variant="h6" fontWeight={700} color="#7c3aed">{waterYearlyCount}</Typography>
+                          </CardContent>
+                        </Card>
+                        <Card sx={{ borderRadius: 2, border: '1px solid', borderColor: alpha('#ea580c', 0.2) }}>
+                          <CardContent>
+                            <Typography variant="body2" color="textSecondary">Year Total Amount</Typography>
+                            <Typography variant="h6" fontWeight={700} color="#ea580c">{formatCurrency(waterYearlyTotal)}</Typography>
+                          </CardContent>
+                        </Card>
+                      </Box>
+
+                      {waterPayments.length === 0 ? (
+                        <Box sx={{ p: isMobile ? 4 : 6, textAlign: 'center' }}>
+                          <Avatar sx={{ bgcolor: alpha('#1976d2', 0.1), color: '#1976d2', width: isMobile ? 60 : 80, height: isMobile ? 60 : 80, margin: '0 auto 16px' }}>
+                            <WaterDropIcon sx={{ fontSize: isMobile ? 30 : 40 }} />
+                          </Avatar>
+                          <Typography variant={isMobile ? "body1" : "h6"} color="textSecondary" gutterBottom>
+                            No water payment records found
+                          </Typography>
+                          <Typography variant="body2" color="textSecondary">
+                            No water payment records for {getMonthName(selectedMonth)} {selectedYear}
+                          </Typography>
+                        </Box>
+                      ) : (
+                        <TableContainer sx={{ maxHeight: isMobile ? 300 : 420, borderRadius: 2 }}>
+                          <Table stickyHeader size={isMobile ? "small" : "medium"}>
+                            <TableHead>
+                              <TableRow>
+                                <StyledTableCell className="header">Date</StyledTableCell>
+                                <StyledTableCell className="header">Service</StyledTableCell>
+                                {!isMobile && <StyledTableCell className="header">Customer</StyledTableCell>}
+                                <StyledTableCell className="header" align="right">Amount</StyledTableCell>
+                                {!isMobile && <StyledTableCell className="header">Notes</StyledTableCell>}
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {waterPayments.map((payment, index) => (
+                                <TableRow
+                                  key={payment.id}
+                                  hover
+                                  sx={{
+                                    animation: `slideIn 0.3s ease ${index * 0.05}s`,
+                                    '@keyframes slideIn': {
+                                      '0%': { opacity: 0, transform: 'translateX(-20px)' },
+                                      '100%': { opacity: 1, transform: 'translateX(0)' }
+                                    }
+                                  }}
+                                >
+                                  <TableCell>
+                                    <Typography variant="body2">{formatDate(payment.service_date)}</Typography>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Typography variant="body2" fontWeight="600">
+                                      {payment.service_code || `#${payment.service_id}`}
+                                    </Typography>
+                                  </TableCell>
+                                  {!isMobile && (
+                                    <TableCell>
+                                      <Typography variant="body2">{payment.customer_name || '-'}</Typography>
+                                    </TableCell>
+                                  )}
+                                  <TableCell align="right">
+                                    <Typography fontWeight="700" color="#10b981" sx={{ fontSize: isMobile ? '0.85rem' : '0.95rem' }}>
+                                      {formatCurrency(payment.amount)}
+                                    </Typography>
+                                  </TableCell>
+                                  {!isMobile && (
+                                    <TableCell>
+                                      <Tooltip title={payment.notes || 'No notes'}>
+                                        <DescriptionIcon
+                                          sx={{
+                                            color: payment.notes ? '#1976d2' : '#E5E7EB',
+                                            fontSize: 16,
+                                            cursor: 'help'
+                                          }}
+                                        />
+                                      </Tooltip>
+                                    </TableCell>
+                                  )}
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </TableContainer>
+                      )}
+                    </>
                   )}
                 </div>
               </Fade>

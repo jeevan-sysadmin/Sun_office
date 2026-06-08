@@ -38,6 +38,7 @@ import {
 import DeleteConfirmationModal from "./modals/DeleteConfirmationModal";
 import StaffFormModal from "./modals/StaffFormModal";
 import jsPDF from 'jspdf';
+import { API_BASE_URL as DEFAULT_API_BASE_URL } from "../config/api";
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import "./css/StaffTab.css";
@@ -150,7 +151,7 @@ const StaffTab: React.FC<StaffTabProps> = ({
   onFilterStaffRoleChange,
   onSearchChange,
   loading = false,
-  apiBaseUrl = "http://localhost/sun_office/api",
+  apiBaseUrl = DEFAULT_API_BASE_URL,
   refreshStaff
 }) => {
   // Date filter states
@@ -187,6 +188,10 @@ const StaffTab: React.FC<StaffTabProps> = ({
   const [showAddModal, setShowAddModal] = useState(false);
   const [showSalaryHistory, setShowSalaryHistory] = useState(false);
   const [showExpenseHistory, setShowExpenseHistory] = useState(false);
+  const [showEditSalaryModal, setShowEditSalaryModal] = useState(false);
+  const [showEditExpenseModal, setShowEditExpenseModal] = useState(false);
+  const [editingSalary, setEditingSalary] = useState<Salary | null>(null);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [selectedStaff, setSelectedStaff] = useState<User | null>(null);
   
   // API data states
@@ -220,6 +225,17 @@ const StaffTab: React.FC<StaffTabProps> = ({
     deductions: '0',
     notes: ''
   });
+  const [editSalaryForm, setEditSalaryForm] = useState({
+    service_type: 'water' as 'water' | 'inverter',
+    amount: '',
+    salary_date: getCurrentDate(),
+    salary_month: getCurrentMonth(),
+    payment_method: 'bank_transfer',
+    transaction_id: '',
+    bonus: '0',
+    deductions: '0',
+    notes: ''
+  });
   
   const [expenseForm, setExpenseForm] = useState({
     expense_type: '',
@@ -230,9 +246,19 @@ const StaffTab: React.FC<StaffTabProps> = ({
     receipt_number: '',
     notes: ''
   });
+  const [editExpenseForm, setEditExpenseForm] = useState({
+    expense_type: 'others',
+    amount: '',
+    description: '',
+    expense_date: getCurrentDate(),
+    payment_method: 'cash',
+    receipt_number: '',
+    notes: ''
+  });
   
   // Use custom Timeout type instead of NodeJS.Timeout
   const searchTimeoutRef = useRef<Timeout | null>(null);
+  const notificationTimeoutRef = useRef<Timeout | null>(null);
   
   const [notification, setNotification] = useState<{show: boolean, message: string, type: 'success' | 'error' | 'info'}>({
     show: false,
@@ -428,6 +454,9 @@ const StaffTab: React.FC<StaffTabProps> = ({
   };
 
   const allFilteredStaff = getFilteredStaff();
+  const quickActionStaff = selectedItems.size > 0
+    ? allFilteredStaff.find((member) => selectedItems.has(member.id)) || null
+    : null;
   
   // Pagination calculations
   const totalItems = allFilteredStaff.length;
@@ -643,15 +672,46 @@ const StaffTab: React.FC<StaffTabProps> = ({
 
   // Show notification
   const showNotification = (message: string, type: 'success' | 'error' | 'info') => {
+    if (notificationTimeoutRef.current) {
+      clearTimeout(notificationTimeoutRef.current);
+      notificationTimeoutRef.current = null;
+    }
+
     setNotification({
       show: true,
       message,
       type
     });
-    setTimeout(() => {
+
+    notificationTimeoutRef.current = setTimeout(() => {
       setNotification(prev => ({ ...prev, show: false }));
+      notificationTimeoutRef.current = null;
     }, 3000);
   };
+
+  const getMonthFromPaidDate = (paidDate?: string, fallbackMonth?: string): string => {
+    if (paidDate) {
+      try {
+        const d = new Date(paidDate);
+        if (!isNaN(d.getTime())) {
+          const y = d.getFullYear();
+          const m = String(d.getMonth() + 1).padStart(2, '0');
+          return `${y}-${m}`;
+        }
+      } catch {
+        // ignore and fallback
+      }
+    }
+    return fallbackMonth || '';
+  };
+
+  useEffect(() => {
+    return () => {
+      if (notificationTimeoutRef.current) {
+        clearTimeout(notificationTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Fetch salaries for selected staff
   const fetchStaffSalaries = async (staffId: number) => {
@@ -908,6 +968,83 @@ const StaffTab: React.FC<StaffTabProps> = ({
     setShowSalaryModal(true);
   };
 
+  const handleEditSalaryRecord = (salary: Salary) => {
+    setEditingSalary(salary);
+    setEditSalaryForm({
+      service_type: salary.service_type,
+      amount: String(salary.amount ?? ''),
+      salary_date: salary.salary_date || getCurrentDate(),
+      salary_month: salary.salary_month || getCurrentMonth(),
+      payment_method: salary.payment_method || 'bank_transfer',
+      transaction_id: salary.transaction_id || '',
+      bonus: String(salary.bonus ?? 0),
+      deductions: String(salary.deductions ?? 0),
+      notes: salary.notes || ''
+    });
+    setShowEditSalaryModal(true);
+  };
+
+  const updateSalaryRecord = async () => {
+    if (!editingSalary || !selectedStaff) return;
+    try {
+      setApiLoading(true);
+
+      const amount = parseFloat(editSalaryForm.amount || '0');
+      const bonus = parseFloat(editSalaryForm.bonus || '0');
+      const deductions = parseFloat(editSalaryForm.deductions || '0');
+      const netAmount = amount + bonus - deductions;
+
+      if (amount <= 0) {
+        showNotification('Amount must be greater than 0', 'error');
+        setApiLoading(false);
+        return;
+      }
+      if (!editSalaryForm.salary_month.match(/^\d{4}-\d{2}$/)) {
+        showNotification('Salary month must be in YYYY-MM format', 'error');
+        setApiLoading(false);
+        return;
+      }
+
+      const payload = {
+        service_type: editSalaryForm.service_type,
+        amount,
+        salary_date: editSalaryForm.salary_date,
+        salary_month: editSalaryForm.salary_month,
+        payment_method: editSalaryForm.payment_method,
+        transaction_id: editSalaryForm.transaction_id || `TXN${Date.now()}`,
+        bonus,
+        deductions,
+        net_amount: netAmount,
+        notes: editSalaryForm.notes,
+        staff_id: selectedStaff.id,
+        staff_name: selectedStaff.name
+      };
+
+      const response = await fetch(`${apiBaseUrl}/salary.php?id=${editingSalary.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json();
+      if (!data.success) {
+        throw new Error(data.message || 'Failed to update salary');
+      }
+
+      showNotification('Salary history updated successfully', 'success');
+      setShowEditSalaryModal(false);
+      setEditingSalary(null);
+      await fetchStaffSalaries(selectedStaff.id);
+      await fetchSalaryStats(selectedStaff.id);
+    } catch (error: any) {
+      console.error('Error updating salary:', error);
+      showNotification(error.message || 'Failed to update salary', 'error');
+    } finally {
+      setApiLoading(false);
+    }
+  };
+
   // Handle add expense
   const handleAddExpense = (staffMember: User) => {
     setSelectedStaff(staffMember);
@@ -933,6 +1070,68 @@ const StaffTab: React.FC<StaffTabProps> = ({
   const handleExpenseSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     createExpense();
+  };
+
+  const handleEditExpenseRecord = (expense: Expense) => {
+    setEditingExpense(expense);
+    setEditExpenseForm({
+      expense_type: expense.expense_type || 'others',
+      amount: String(expense.amount ?? ''),
+      description: expense.description || '',
+      expense_date: expense.expense_date || getCurrentDate(),
+      payment_method: expense.payment_method || 'cash',
+      receipt_number: expense.receipt_number || '',
+      notes: expense.notes || ''
+    });
+    setShowEditExpenseModal(true);
+  };
+
+  const updateExpenseRecord = async () => {
+    if (!editingExpense || !selectedStaff) return;
+    try {
+      setApiLoading(true);
+      const amount = parseFloat(editExpenseForm.amount || '0');
+      if (amount <= 0) {
+        showNotification('Amount must be greater than 0', 'error');
+        setApiLoading(false);
+        return;
+      }
+
+      const payload = {
+        staff_id: selectedStaff.id,
+        staff_name: selectedStaff.name,
+        expense_type: editExpenseForm.expense_type,
+        amount,
+        description: editExpenseForm.description,
+        expense_date: editExpenseForm.expense_date,
+        payment_method: editExpenseForm.payment_method,
+        receipt_number: editExpenseForm.receipt_number || null,
+        notes: editExpenseForm.notes
+      };
+
+      const response = await fetch(`${apiBaseUrl}/expenses.php?id=${editingExpense.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json();
+      if (!data.success) {
+        throw new Error(data.message || 'Failed to update expense');
+      }
+
+      showNotification('Expense history updated successfully', 'success');
+      setShowEditExpenseModal(false);
+      setEditingExpense(null);
+      await fetchStaffExpenses(selectedStaff.id);
+      await fetchExpenseStats(selectedStaff.id);
+    } catch (error: any) {
+      console.error('Error updating expense:', error);
+      showNotification(error.message || 'Failed to update expense', 'error');
+    } finally {
+      setApiLoading(false);
+    }
   };
 
   // Calculate net amount
@@ -2527,6 +2726,7 @@ const StaffTab: React.FC<StaffTabProps> = ({
                               <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: '#374151' }}>Net Amount</th>
                               <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: '#374151' }}>Payment Method</th>
                               <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: '#374151' }}>Paid Date</th>
+                              <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: '#374151' }}>Actions</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -2544,7 +2744,7 @@ const StaffTab: React.FC<StaffTabProps> = ({
                                     {salary.service_type === 'water' ? '💧 Water' : '⚡ Inverter'}
                                   </span>
                                 </td>
-                                <td style={{ padding: '12px' }}>{formatMonth(salary.salary_month)}</td>
+                                <td style={{ padding: '12px' }}>{formatMonth(getMonthFromPaidDate(salary.salary_date, salary.salary_month))}</td>
                                 <td style={{ padding: '12px' }}>{formatCurrency(salary.amount)}</td>
                                 <td style={{ padding: '12px', color: '#10b981' }}>{salary.bonus > 0 ? `+${formatCurrency(salary.bonus)}` : '-'}</td>
                                 <td style={{ padding: '12px', color: '#ef4444' }}>{salary.deductions > 0 ? `-${formatCurrency(salary.deductions)}` : '-'}</td>
@@ -2566,6 +2766,27 @@ const StaffTab: React.FC<StaffTabProps> = ({
                                   </span>
                                 </td>
                                 <td style={{ padding: '12px' }}>{formatDate(salary.salary_date)}</td>
+                                <td style={{ padding: '12px' }}>
+                                  <button
+                                    onClick={() => handleEditSalaryRecord(salary)}
+                                    style={{
+                                      border: '1px solid #bfdbfe',
+                                      backgroundColor: '#eff6ff',
+                                      color: '#1d4ed8',
+                                      borderRadius: '6px',
+                                      padding: '6px 10px',
+                                      cursor: 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '6px',
+                                      fontSize: '12px',
+                                      fontWeight: 600
+                                    }}
+                                  >
+                                    <FiEdit2 size={12} />
+                                    Edit
+                                  </button>
+                                </td>
                               </tr>
                             ))}
                           </tbody>
@@ -2638,6 +2859,69 @@ const StaffTab: React.FC<StaffTabProps> = ({
                   <FiDollarSign />
                   Add New Salary
                 </MotionButton>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Edit Salary Modal */}
+      <AnimatePresence>
+        {showEditSalaryModal && editingSalary && (
+          <motion.div
+            className="modal-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowEditSalaryModal(false)}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0,0,0,0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1200,
+              padding: isMobile ? '16px' : '20px'
+            }}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                backgroundColor: '#fff',
+                borderRadius: '12px',
+                width: '100%',
+                maxWidth: '560px',
+                maxHeight: '90vh',
+                overflow: 'auto',
+                padding: '20px'
+              }}
+            >
+              <h3 style={{ margin: '0 0 16px 0' }}>Edit Salary History</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
+                <select value={editSalaryForm.service_type} onChange={(e) => setEditSalaryForm({ ...editSalaryForm, service_type: e.target.value as 'water' | 'inverter' })} style={{ padding: '10px', border: '1px solid #d1d5db', borderRadius: '8px' }}>
+                  <option value="water">Water</option>
+                  <option value="inverter">Inverter</option>
+                </select>
+                <input type="month" value={editSalaryForm.salary_month} onChange={(e) => setEditSalaryForm({ ...editSalaryForm, salary_month: e.target.value })} style={{ padding: '10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
+                <input type="number" placeholder="Amount" value={editSalaryForm.amount} onChange={(e) => setEditSalaryForm({ ...editSalaryForm, amount: e.target.value })} style={{ padding: '10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
+                <input type="date" value={editSalaryForm.salary_date} onChange={(e) => setEditSalaryForm({ ...editSalaryForm, salary_date: e.target.value })} style={{ padding: '10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
+                <input type="number" placeholder="Bonus" value={editSalaryForm.bonus} onChange={(e) => setEditSalaryForm({ ...editSalaryForm, bonus: e.target.value })} style={{ padding: '10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
+                <input type="number" placeholder="Deductions" value={editSalaryForm.deductions} onChange={(e) => setEditSalaryForm({ ...editSalaryForm, deductions: e.target.value })} style={{ padding: '10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
+                <input type="text" placeholder="Transaction ID" value={editSalaryForm.transaction_id} onChange={(e) => setEditSalaryForm({ ...editSalaryForm, transaction_id: e.target.value })} style={{ gridColumn: isMobile ? 'span 1' : 'span 2', padding: '10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
+                <textarea placeholder="Notes" value={editSalaryForm.notes} onChange={(e) => setEditSalaryForm({ ...editSalaryForm, notes: e.target.value })} style={{ gridColumn: isMobile ? 'span 1' : 'span 2', minHeight: '90px', padding: '10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '16px' }}>
+                <button onClick={() => setShowEditSalaryModal(false)} style={{ padding: '10px 16px', borderRadius: '8px', border: '1px solid #d1d5db', backgroundColor: '#fff', cursor: 'pointer' }}>Cancel</button>
+                <button onClick={updateSalaryRecord} style={{ padding: '10px 16px', borderRadius: '8px', border: 'none', backgroundColor: '#2563eb', color: '#fff', cursor: 'pointer' }}>
+                  {apiLoading ? 'Saving...' : 'Update Salary'}
+                </button>
               </div>
             </motion.div>
           </motion.div>
@@ -2778,6 +3062,7 @@ const StaffTab: React.FC<StaffTabProps> = ({
                               <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: '#374151' }}>Amount</th>
                               <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: '#374151' }}>Payment</th>
                               <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: '#374151' }}>Receipt</th>
+                              <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: '#374151' }}>Actions</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -2821,6 +3106,27 @@ const StaffTab: React.FC<StaffTabProps> = ({
                                   </span>
                                 </td>
                                 <td style={{ padding: '12px' }}>{expense.receipt_number || '-'}</td>
+                                <td style={{ padding: '12px' }}>
+                                  <button
+                                    onClick={() => handleEditExpenseRecord(expense)}
+                                    style={{
+                                      border: '1px solid #fed7aa',
+                                      backgroundColor: '#fff7ed',
+                                      color: '#c2410c',
+                                      borderRadius: '6px',
+                                      padding: '6px 10px',
+                                      cursor: 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '6px',
+                                      fontSize: '12px',
+                                      fontWeight: 600
+                                    }}
+                                  >
+                                    <FiEdit2 size={12} />
+                                    Edit
+                                  </button>
+                                </td>
                               </tr>
                             ))}
                           </tbody>
@@ -2893,6 +3199,76 @@ const StaffTab: React.FC<StaffTabProps> = ({
                   <FiCreditCard />
                   Add New Expense
                 </MotionButton>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Edit Expense Modal */}
+      <AnimatePresence>
+        {showEditExpenseModal && editingExpense && (
+          <motion.div
+            className="modal-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowEditExpenseModal(false)}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0,0,0,0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1200,
+              padding: isMobile ? '16px' : '20px'
+            }}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                backgroundColor: '#fff',
+                borderRadius: '12px',
+                width: '100%',
+                maxWidth: '560px',
+                maxHeight: '90vh',
+                overflow: 'auto',
+                padding: '20px'
+              }}
+            >
+              <h3 style={{ margin: '0 0 16px 0' }}>Edit Expense History</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
+                <select value={editExpenseForm.expense_type} onChange={(e) => setEditExpenseForm({ ...editExpenseForm, expense_type: e.target.value })} style={{ padding: '10px', border: '1px solid #d1d5db', borderRadius: '8px' }}>
+                  <option value="petrol">Petrol</option>
+                  <option value="others">Others</option>
+                  <option value="travel">Travel</option>
+                  <option value="food">Food</option>
+                  <option value="stationery">Stationery</option>
+                </select>
+                <input type="number" placeholder="Amount" value={editExpenseForm.amount} onChange={(e) => setEditExpenseForm({ ...editExpenseForm, amount: e.target.value })} style={{ padding: '10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
+                <input type="date" value={editExpenseForm.expense_date} onChange={(e) => setEditExpenseForm({ ...editExpenseForm, expense_date: e.target.value })} style={{ padding: '10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
+                <select value={editExpenseForm.payment_method} onChange={(e) => setEditExpenseForm({ ...editExpenseForm, payment_method: e.target.value })} style={{ padding: '10px', border: '1px solid #d1d5db', borderRadius: '8px' }}>
+                  <option value="cash">Cash</option>
+                  <option value="card">Card</option>
+                  <option value="upi">UPI</option>
+                  <option value="bank_transfer">Bank Transfer</option>
+                </select>
+                <input type="text" placeholder="Receipt Number" value={editExpenseForm.receipt_number} onChange={(e) => setEditExpenseForm({ ...editExpenseForm, receipt_number: e.target.value })} style={{ gridColumn: isMobile ? 'span 1' : 'span 2', padding: '10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
+                <textarea placeholder="Description" value={editExpenseForm.description} onChange={(e) => setEditExpenseForm({ ...editExpenseForm, description: e.target.value })} style={{ gridColumn: isMobile ? 'span 1' : 'span 2', minHeight: '72px', padding: '10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
+                <textarea placeholder="Notes" value={editExpenseForm.notes} onChange={(e) => setEditExpenseForm({ ...editExpenseForm, notes: e.target.value })} style={{ gridColumn: isMobile ? 'span 1' : 'span 2', minHeight: '72px', padding: '10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '16px' }}>
+                <button onClick={() => setShowEditExpenseModal(false)} style={{ padding: '10px 16px', borderRadius: '8px', border: '1px solid #d1d5db', backgroundColor: '#fff', cursor: 'pointer' }}>Cancel</button>
+                <button onClick={updateExpenseRecord} style={{ padding: '10px 16px', borderRadius: '8px', border: 'none', backgroundColor: '#ea580c', color: '#fff', cursor: 'pointer' }}>
+                  {apiLoading ? 'Saving...' : 'Update Expense'}
+                </button>
               </div>
             </motion.div>
           </motion.div>
@@ -3052,6 +3428,70 @@ const StaffTab: React.FC<StaffTabProps> = ({
               >
                 <FiUserPlus size={isMobile ? 16 : 18} />
                 <span>{isMobile ? 'Add' : 'Add Staff'}</span>
+              </MotionButton>
+
+              <MotionButton
+                className="btn"
+                onClick={() => {
+                  if (quickActionStaff) handleViewSalaryHistory(quickActionStaff);
+                  if (isMobile) setShowMobileActions(false);
+                }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                disabled={!quickActionStaff}
+                title="View Salary History (S)"
+                style={{
+                  padding: isMobile ? '8px 12px' : '10px 16px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: 'white',
+                  color: '#10b981',
+                  cursor: !quickActionStaff ? 'not-allowed' : 'pointer',
+                  fontSize: isMobile ? '13px' : '14px',
+                  fontWeight: '600',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: isMobile ? '4px' : '6px',
+                  boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+                  opacity: !quickActionStaff ? 0.5 : 1,
+                  flex: isMobile ? '1' : 'auto',
+                  justifyContent: 'center'
+                }}
+              >
+                <FiDollarSign size={isMobile ? 14 : 16} />
+                <span>Salary (S)</span>
+              </MotionButton>
+
+              <MotionButton
+                className="btn"
+                onClick={() => {
+                  if (quickActionStaff) handleViewExpenseHistory(quickActionStaff);
+                  if (isMobile) setShowMobileActions(false);
+                }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                disabled={!quickActionStaff}
+                title="View Expense History (X)"
+                style={{
+                  padding: isMobile ? '8px 12px' : '10px 16px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: 'white',
+                  color: '#f59e0b',
+                  cursor: !quickActionStaff ? 'not-allowed' : 'pointer',
+                  fontSize: isMobile ? '13px' : '14px',
+                  fontWeight: '600',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: isMobile ? '4px' : '6px',
+                  boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+                  opacity: !quickActionStaff ? 0.5 : 1,
+                  flex: isMobile ? '1' : 'auto',
+                  justifyContent: 'center'
+                }}
+              >
+                <FiCreditCard size={isMobile ? 14 : 16} />
+                <span>Expense (X)</span>
               </MotionButton>
 
               <MotionButton 
@@ -3805,7 +4245,7 @@ const StaffTab: React.FC<StaffTabProps> = ({
               }}>
                 <thead>
                   <tr style={{
-                    backgroundColor: '#667eea',
+                    backgroundColor: '#f3f4f6',
                     borderBottom: '2px solid #e5e7eb'
                   }}>
                     <th style={{
@@ -3822,7 +4262,7 @@ const StaffTab: React.FC<StaffTabProps> = ({
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          color: '#ffffff'
+                          color: '#000000'
                         }}
                       >
                         {selectAll ? <FiCheckSquare size={16} /> : <FiSquare size={16} />}
@@ -3832,7 +4272,7 @@ const StaffTab: React.FC<StaffTabProps> = ({
                       padding: isTablet ? '12px' : '14px',
                       textAlign: 'left',
                       fontWeight: '600',
-                      color: '#ffffff',
+                      color: '#000000',
                       fontSize: isTablet ? '11px' : '12px',
                       textTransform: 'uppercase',
                       letterSpacing: '0.05em'
@@ -3841,7 +4281,7 @@ const StaffTab: React.FC<StaffTabProps> = ({
                       padding: isTablet ? '12px' : '14px',
                       textAlign: 'left',
                       fontWeight: '600',
-                      color: '#ffffff',
+                      color: '#000000',
                       fontSize: isTablet ? '11px' : '12px',
                       textTransform: 'uppercase',
                       letterSpacing: '0.05em'
@@ -3850,7 +4290,7 @@ const StaffTab: React.FC<StaffTabProps> = ({
                       padding: isTablet ? '12px' : '14px',
                       textAlign: 'left',
                       fontWeight: '600',
-                      color: '#ffffff',
+                      color: '#000000',
                       fontSize: isTablet ? '11px' : '12px',
                       textTransform: 'uppercase',
                       letterSpacing: '0.05em'
@@ -3859,7 +4299,7 @@ const StaffTab: React.FC<StaffTabProps> = ({
                       padding: isTablet ? '12px' : '14px',
                       textAlign: 'left',
                       fontWeight: '600',
-                      color: '#ffffff',
+                      color: '#000000',
                       fontSize: isTablet ? '11px' : '12px',
                       textTransform: 'uppercase',
                       letterSpacing: '0.05em'
@@ -3868,7 +4308,7 @@ const StaffTab: React.FC<StaffTabProps> = ({
                       padding: isTablet ? '12px' : '14px',
                       textAlign: 'left',
                       fontWeight: '600',
-                      color: '#ffffff',
+                      color: '#000000',
                       fontSize: isTablet ? '11px' : '12px',
                       textTransform: 'uppercase',
                       letterSpacing: '0.05em'
@@ -3877,7 +4317,7 @@ const StaffTab: React.FC<StaffTabProps> = ({
                       padding: isTablet ? '12px' : '14px',
                       textAlign: 'left',
                       fontWeight: '600',
-                      color: '#ffffff',
+                      color: '#000000',
                       fontSize: isTablet ? '11px' : '12px',
                       textTransform: 'uppercase',
                       letterSpacing: '0.05em'
@@ -3886,11 +4326,16 @@ const StaffTab: React.FC<StaffTabProps> = ({
                       padding: isTablet ? '12px' : '14px',
                       textAlign: 'center',
                       fontWeight: '600',
-                      color: '#ffffff',
+                      color: '#000000',
                       fontSize: isTablet ? '11px' : '12px',
                       textTransform: 'uppercase',
                       letterSpacing: '0.05em'
-                    }}>Actions</th>
+                    }}>
+                      <div>Actions</div>
+                      <div style={{ fontSize: '10px', fontWeight: 500, color: '#111827', marginTop: '2px', letterSpacing: '0' }}>
+                        V View | S Salary | X Expense | E Edit | D Delete
+                      </div>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -3957,8 +4402,8 @@ const StaffTab: React.FC<StaffTabProps> = ({
                       </td>
                       <td style={{ padding: isTablet ? '12px' : '14px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <FiMail style={{ color: '#6b7280', fontSize: isTablet ? '11px' : '12px' }} />
-                          <span style={{ fontSize: isTablet ? '12px' : '13px', color: '#4b5563' }}>
+                          <FiMail style={{ color: '#000000', fontSize: isTablet ? '11px' : '12px' }} />
+                          <span style={{ fontSize: isTablet ? '12px' : '13px', color: '#000000' }}>
                             {staffMember.email}
                           </span>
                         </div>
@@ -3976,9 +4421,9 @@ const StaffTab: React.FC<StaffTabProps> = ({
                         </span>
                       </td>
                       <td style={{ padding: isTablet ? '12px' : '14px' }}>
-                        <span style={{ fontSize: isTablet ? '12px' : '13px', color: '#4b5563' }}>
+                        <span style={{ fontSize: isTablet ? '12px' : '13px', color: '#000000' }}>
                           {staffMember.department || '-'}
-                          {staffMember.position && <span style={{ fontSize: isTablet ? '10px' : '11px', color: '#6b7280', marginLeft: '4px' }}>({staffMember.position})</span>}
+                          {staffMember.position && <span style={{ fontSize: isTablet ? '10px' : '11px', color: '#000000', marginLeft: '4px' }}>({staffMember.position})</span>}
                         </span>
                       </td>
                       <td style={{ padding: isTablet ? '12px' : '14px' }}>
@@ -3995,8 +4440,8 @@ const StaffTab: React.FC<StaffTabProps> = ({
                       </td>
                       <td style={{ padding: isTablet ? '12px' : '14px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <FiCalendar style={{ color: '#6b7280', fontSize: isTablet ? '11px' : '12px' }} />
-                          <span style={{ fontSize: isTablet ? '12px' : '13px', color: '#4b5563' }}>
+                          <FiCalendar style={{ color: '#000000', fontSize: isTablet ? '11px' : '12px' }} />
+                          <span style={{ fontSize: isTablet ? '12px' : '13px', color: '#000000' }}>
                             {formatDate(staffMember.created_at)}
                           </span>
                         </div>
@@ -4016,7 +4461,7 @@ const StaffTab: React.FC<StaffTabProps> = ({
                             }}
                             whileHover={{ scale: 1.1, backgroundColor: '#e0f2fe' }}
                             whileTap={{ scale: 0.9 }}
-                            title="View Details"
+                            title="View Details (V)"
                             style={{
                               width: isTablet ? '30px' : '32px',
                               height: isTablet ? '30px' : '32px',
@@ -4042,7 +4487,7 @@ const StaffTab: React.FC<StaffTabProps> = ({
                             }}
                             whileHover={{ scale: 1.1, backgroundColor: '#d1fae5' }}
                             whileTap={{ scale: 0.9 }}
-                            title="View Salary History"
+                            title="View Salary History (S)"
                             style={{
                               width: isTablet ? '30px' : '32px',
                               height: isTablet ? '30px' : '32px',
@@ -4058,7 +4503,10 @@ const StaffTab: React.FC<StaffTabProps> = ({
                               transition: 'all 0.2s'
                             }}
                           >
-                            <FiDollarSign />
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <FiDollarSign />
+                              <span style={{ fontSize: '9px', fontWeight: 700 }}>S</span>
+                            </span>
                           </MotionButton>
                           <MotionButton 
                             className="action-btn expense"
@@ -4068,7 +4516,7 @@ const StaffTab: React.FC<StaffTabProps> = ({
                             }}
                             whileHover={{ scale: 1.1, backgroundColor: '#fef3c7' }}
                             whileTap={{ scale: 0.9 }}
-                            title="View Expense History"
+                            title="View Expense History (X)"
                             style={{
                               width: isTablet ? '30px' : '32px',
                               height: isTablet ? '30px' : '32px',
@@ -4084,7 +4532,10 @@ const StaffTab: React.FC<StaffTabProps> = ({
                               transition: 'all 0.2s'
                             }}
                           >
-                            <FiCreditCard />
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <FiCreditCard />
+                              <span style={{ fontSize: '9px', fontWeight: 700 }}>X</span>
+                            </span>
                           </MotionButton>
                           <MotionButton 
                             className="action-btn edit"
@@ -4094,7 +4545,7 @@ const StaffTab: React.FC<StaffTabProps> = ({
                             }}
                             whileHover={{ scale: 1.1, backgroundColor: '#fef3c7' }}
                             whileTap={{ scale: 0.9 }}
-                            title="Edit Staff"
+                            title="Edit Staff (E)"
                             style={{
                               width: isTablet ? '30px' : '32px',
                               height: isTablet ? '30px' : '32px',
@@ -4117,7 +4568,7 @@ const StaffTab: React.FC<StaffTabProps> = ({
                             onClick={(e) => handleDeleteClick(e, staffMember.id)}
                             whileHover={{ scale: 1.1, backgroundColor: '#fee2e2' }}
                             whileTap={{ scale: 0.9 }}
-                            title="Delete Staff"
+                            title="Delete Staff (D)"
                             style={{
                               width: isTablet ? '30px' : '32px',
                               height: isTablet ? '30px' : '32px',

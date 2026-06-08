@@ -32,6 +32,7 @@ import "./css/PendingCallsTab.css";
 // Add jsPDF and autoTable for PDF generation
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { API_BASE_URL as DEFAULT_API_BASE_URL } from "../config/api";
 
 interface WaterService {
   id: number;
@@ -44,7 +45,12 @@ interface WaterService {
 
 interface ActiveService {
   service_code: string;
-  battery_model: string;
+  battery_model?: string;
+  inverter_model?: string;
+  product_name?: string;
+  product_names?: string | string[];
+  serial_number?: string;
+  serial_numbers?: string | string[];
   created_date: string;
 }
 
@@ -105,7 +111,7 @@ interface PendingCallsTabProps {
 const PendingCallsTab: React.FC<PendingCallsTabProps> = ({ 
   onCallCustomer, 
   onMessageCustomer,
-  apiBaseUrl = "http://localhost/sun_office/api"
+  apiBaseUrl = DEFAULT_API_BASE_URL
 }) => {
   // State for cities data
   const [cities, setCities] = useState<City[]>([]);
@@ -139,6 +145,33 @@ const PendingCallsTab: React.FC<PendingCallsTabProps> = ({
   
   // API Base URL
   const API_BASE_URL = apiBaseUrl;
+
+  const getServiceProductLabels = (service: ActiveService): string[] => {
+    const raw: string[] = [];
+
+    const collect = (value: unknown) => {
+      if (Array.isArray(value)) {
+        value.forEach(collect);
+        return;
+      }
+      if (value === null || value === undefined) return;
+      const text = String(value).trim();
+      if (!text) return;
+      text
+        .split(/,|\||\n/)
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .forEach((s) => raw.push(s));
+    };
+
+    collect(service.product_names);
+    collect(service.product_name);
+    collect(service.battery_model);
+    collect(service.inverter_model);
+
+    // Remove duplicates while preserving order
+    return Array.from(new Set(raw));
+  };
   
   // Load cities from customers API on component mount
   useEffect(() => {
@@ -195,8 +228,8 @@ const PendingCallsTab: React.FC<PendingCallsTabProps> = ({
     
     const searchLower = citySearchTerm.toLowerCase();
     return cities.filter(city => 
-      city.name.toLowerCase().includes(searchLower) ||
-      city.state.toLowerCase().includes(searchLower)
+      (city.name || '').toLowerCase().includes(searchLower) ||
+      (city.state || '').toLowerCase().includes(searchLower)
     );
   }, [cities, citySearchTerm]);
   
@@ -317,18 +350,18 @@ const PendingCallsTab: React.FC<PendingCallsTabProps> = ({
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
       filtered = filtered.filter(call => 
-        call.full_name.toLowerCase().includes(searchLower) ||
-        call.phone.includes(searchTerm) ||
-        call.customer_code.toLowerCase().includes(searchLower) ||
-        call.email.toLowerCase().includes(searchLower) ||
-        call.address.toLowerCase().includes(searchLower)
+        (call.full_name || '').toLowerCase().includes(searchLower) ||
+        (call.phone || '').includes(searchTerm) ||
+        (call.customer_code || '').toLowerCase().includes(searchLower) ||
+        (call.email || '').toLowerCase().includes(searchLower) ||
+        (call.address || '').toLowerCase().includes(searchLower)
       );
     }
     
     // Apply priority filter
     if (priorityFilter !== 'all') {
       filtered = filtered.filter(call => 
-        call.priority.toLowerCase() === priorityFilter.toLowerCase()
+        (call.priority || '').toLowerCase() === priorityFilter.toLowerCase()
       );
     }
     
@@ -600,7 +633,7 @@ const PendingCallsTab: React.FC<PendingCallsTabProps> = ({
                 <td>${call.phone}</td>
                 <td>${call.email}</td>
                 <td>${call.city}</td>
-                <td class="priority-${call.priority.toLowerCase()}">${call.priority}</td>
+                <td class="priority-${(call.priority || '').toLowerCase()}">${call.priority || ''}</td>
                 <td>${call.water_service_status.pending_status}</td>
                 <td>${call.active_services.count}</td>
               </tr>
@@ -626,7 +659,7 @@ const PendingCallsTab: React.FC<PendingCallsTabProps> = ({
   
   // Get priority color
   const getPriorityColor = (priority: string): string => {
-    switch(priority.toLowerCase()) {
+    switch((priority || '').toLowerCase()) {
       case 'high': return '#DC2626';
       case 'medium': return '#F59E0B';
       case 'low': return '#10B981';
@@ -658,9 +691,9 @@ const PendingCallsTab: React.FC<PendingCallsTabProps> = ({
   
   // Calculate stats
   const stats = React.useMemo(() => {
-    const highPriority = filteredCalls.filter(c => c.priority.toLowerCase() === 'high').length;
-    const mediumPriority = filteredCalls.filter(c => c.priority.toLowerCase() === 'medium').length;
-    const lowPriority = filteredCalls.filter(c => c.priority.toLowerCase() === 'low').length;
+    const highPriority = filteredCalls.filter(c => (c.priority || '').toLowerCase() === 'high').length;
+    const mediumPriority = filteredCalls.filter(c => (c.priority || '').toLowerCase() === 'medium').length;
+    const lowPriority = filteredCalls.filter(c => (c.priority || '').toLowerCase() === 'low').length;
     
     const criticalCount = filteredCalls.filter(c => {
       const days = c.water_service_status.days_since_last_service;
@@ -1222,7 +1255,7 @@ const PendingCallsTab: React.FC<PendingCallsTabProps> = ({
             return (
               <motion.div
                 key={call.id}
-                className={`pending-call-list-item priority-${call.priority.toLowerCase()} ${isSelected ? 'expanded' : ''} ${isChecked ? 'selected' : ''}`}
+                className={`pending-call-list-item priority-${(call.priority || '').toLowerCase()} ${isSelected ? 'expanded' : ''} ${isChecked ? 'selected' : ''}`}
                 initial={{ opacity: 0, x: -50 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.3, delay: index * 0.03 }}
@@ -1338,13 +1371,20 @@ const PendingCallsTab: React.FC<PendingCallsTabProps> = ({
                         
                         <div className="detail-section">
                           <h4>Active Services ({call.active_services.count})</h4>
-                          {call.active_services.list.map((service, idx) => (
-                            <div key={idx} className="detail-service-item">
-                              <span className="service-code">{service.service_code}</span>
-                              <span className="service-model">{service.battery_model}</span>
-                              <span className="service-date">{formatDate(service.created_date)}</span>
-                            </div>
-                          ))}
+                          {call.active_services.list.map((service, idx) => {
+                            const productLabels = getServiceProductLabels(service);
+                            return (
+                              <div key={idx} className="detail-service-item">
+                                <span className="service-code">{service.service_code}</span>
+                                <span className="service-model">
+                                  {productLabels.length > 0
+                                    ? productLabels.join(" | ")
+                                    : "Product N/A"}
+                                </span>
+                                <span className="service-date">{formatDate(service.created_date)}</span>
+                              </div>
+                            );
+                          })}
                         </div>
                         
                         {call.notes && (

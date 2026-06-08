@@ -33,7 +33,8 @@ import {
 } from "react-icons/fi";
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import type { ServiceOrder } from "./types";
+import type { Customer, ServiceOrder } from "./types";
+import { WATER_SERVICES_URL } from "../config/api";
 
 // Create motion components properly
 const MotionDiv = motion.div;
@@ -54,6 +55,8 @@ interface WaterServicePayment {
   customer_id: number;
   battery_id?: number | null;
   battery_name?: string | null;
+  service_staff_id?: number | null;
+  service_staff_name?: string | null;
   amount: number;
   service_date: string;
   notes: string;
@@ -62,8 +65,23 @@ interface WaterServicePayment {
   customer_name?: string;
 }
 
+interface ServiceStaff {
+  id: number;
+  name: string;
+  email?: string;
+  role?: string;
+}
+
+interface StaffMonthlySummaryItem {
+  service_staff_id: number | null;
+  service_staff_name: string;
+  service_count: number | string;
+  total_amount: number | string;
+}
+
 interface CardTabProps {
   services: ServiceOrder[];
+  customers: Customer[];
   loading: boolean;
   error?: string | null;
   onRefresh: () => void;
@@ -260,8 +278,32 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   const [batteryId, setBatteryId] = React.useState<string>("");
   const [serviceDate, setServiceDate] = React.useState<string>("");
   const [notes, setNotes] = React.useState<string>("");
+  const [serviceStaffId, setServiceStaffId] = React.useState<string>("");
+  const [serviceStaffList, setServiceStaffList] = React.useState<ServiceStaff[]>([]);
+  const [loadingStaff, setLoadingStaff] = React.useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = React.useState<boolean>(false);
   const [error, setError] = React.useState<string>("");
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+    const fetchStaff = async () => {
+      setLoadingStaff(true);
+      try {
+        const response = await fetch(`${WATER_SERVICES_URL}?action=staff_list`);
+        const result = await response.json();
+        if (response.ok && result.success) {
+          setServiceStaffList(result.records || []);
+        } else {
+          setServiceStaffList([]);
+        }
+      } catch (_err) {
+        setServiceStaffList([]);
+      } finally {
+        setLoadingStaff(false);
+      }
+    };
+    fetchStaff();
+  }, [isOpen]);
 
   React.useEffect(() => {
     const batteries = Array.isArray((service as any)?.batteries) ? (service as any).batteries : [];
@@ -275,11 +317,13 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
       setServiceDate(payment.service_date);
       setNotes(payment.notes || "");
       setBatteryId(payment.battery_id ? String(payment.battery_id) : defaultBatteryId);
+      setServiceStaffId(payment.service_staff_id ? String(payment.service_staff_id) : "");
     } else if (service) {
       setAmount("");
       setServiceDate(new Date().toISOString().split('T')[0]);
       setNotes(`Water service payment for service #${service.service_code} - ${service.customer_name}`);
       setBatteryId(defaultBatteryId);
+      setServiceStaffId((service as any).service_staff_id ? String((service as any).service_staff_id) : "");
     }
     setError("");
   }, [payment, service, mode]);
@@ -298,6 +342,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
           service_date: string;
           notes: string;
           created_by: number;
+          service_staff_id?: number | null;
           id?: number;
         } = {
           service_id: service.id,
@@ -306,7 +351,8 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
           amount: parseFloat(amount),
           service_date: serviceDate,
           notes: notes || `Water service payment for service #${service.service_code}`,
-          created_by: 1
+          created_by: 1,
+          service_staff_id: serviceStaffId ? parseInt(serviceStaffId, 10) : null
         };
         
         if (mode === 'edit' && payment) {
@@ -565,6 +611,42 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                   color: '#374151',
                   marginBottom: '8px'
                 }}>
+                  Service Staff *
+                </label>
+                <select
+                  value={serviceStaffId}
+                  onChange={(e) => setServiceStaffId(e.target.value)}
+                  required
+                  disabled={loadingStaff}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    borderRadius: '10px',
+                    border: '1px solid #d1d5db',
+                    backgroundColor: '#fff',
+                    color: '#111827',
+                    fontSize: '14px',
+                    outline: 'none'
+                  }}
+                >
+                  <option value="">{loadingStaff ? 'Loading staff...' : 'Select staff'}</option>
+                  {serviceStaffList.map((staff) => (
+                    <option key={staff.id} value={String(staff.id)}>
+                      {staff.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Amount Input */}
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  color: '#374151',
+                  marginBottom: '8px'
+                }}>
                   Payment Amount (₹) *
                 </label>
                 <div style={{ position: 'relative' }}>
@@ -718,20 +800,20 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                 type="submit"
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                disabled={!amount || !serviceDate || !batteryId || isSubmitting}
+                disabled={!amount || !serviceDate || !batteryId || !serviceStaffId || isSubmitting}
                 style={{
                   padding: '12px 24px',
                   borderRadius: '10px',
                   border: 'none',
-                  background: !amount || !serviceDate || !batteryId ? '#9ca3af' : (mode === 'edit' ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)'),
+                  background: !amount || !serviceDate || !batteryId || !serviceStaffId ? '#9ca3af' : (mode === 'edit' ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)'),
                   color: '#fff',
                   fontSize: '14px',
                   fontWeight: '500',
-                  cursor: !amount || !serviceDate || !batteryId || isSubmitting ? 'not-allowed' : 'pointer',
+                  cursor: !amount || !serviceDate || !batteryId || !serviceStaffId || isSubmitting ? 'not-allowed' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
-                  opacity: !amount || !serviceDate || !batteryId || isSubmitting ? 0.6 : 1
+                  opacity: !amount || !serviceDate || !batteryId || !serviceStaffId || isSubmitting ? 0.6 : 1
                 }}
               >
                 <FiSave size={16} />
@@ -973,7 +1055,7 @@ const PaymentHistoryModal: React.FC<PaymentHistoryModalProps> = ({
     setError("");
     
     try {
-      const response = await fetch(`http://localhost/sun_office/api/water_services.php?service_id=${service.id}`);
+      const response = await fetch(`${WATER_SERVICES_URL}?service_id=${service.id}`);
       const result = await response.json();
       
       if (response.ok) {
@@ -1823,6 +1905,7 @@ const PaymentHistoryModal: React.FC<PaymentHistoryModalProps> = ({
                             <th style={{ padding: '12px 16px', textAlign: 'left', color: '#374151', fontWeight: '600' }}>Date</th>
                             <th style={{ padding: '12px 16px', textAlign: 'left', color: '#374151', fontWeight: '600' }}>Battery</th>
                             <th style={{ padding: '12px 16px', textAlign: 'left', color: '#374151', fontWeight: '600' }}>Amount</th>
+                            <th style={{ padding: '12px 16px', textAlign: 'left', color: '#374151', fontWeight: '600' }}>Staff</th>
                             <th style={{ padding: '12px 16px', textAlign: 'left', color: '#374151', fontWeight: '600' }}>Notes</th>
                             <th style={{ padding: '12px 16px', textAlign: 'left', color: '#374151', fontWeight: '600' }}>Created At</th>
                             <th style={{ padding: '12px 16px', textAlign: 'center', color: '#374151', fontWeight: '600' }}>Actions</th>
@@ -1856,6 +1939,11 @@ const PaymentHistoryModal: React.FC<PaymentHistoryModalProps> = ({
                                   color: '#059669'
                                 }}>
                                   {formatCurrency(payment.amount)}
+                                </span>
+                              </td>
+                              <td style={{ padding: '14px 16px' }}>
+                                <span style={{ color: '#065f46', fontWeight: '500' }}>
+                                  {payment.service_staff_name || 'Unassigned'}
                                 </span>
                               </td>
                               <td style={{ padding: '14px 16px' }}>
@@ -2014,6 +2102,7 @@ const PaymentHistoryModal: React.FC<PaymentHistoryModalProps> = ({
 
 const CardTab: React.FC<CardTabProps> = ({
   services,
+  customers,
   loading,
   error,
   onRefresh,
@@ -2048,6 +2137,16 @@ const CardTab: React.FC<CardTabProps> = ({
   const [selectAll, setSelectAll] = React.useState<boolean>(false);
   const [exportLoading, setExportLoading] = React.useState(false);
   const [lastRefreshed, setLastRefreshed] = React.useState<Date>(new Date());
+
+  const getAlternatePhone = React.useCallback((service: ServiceOrder) => {
+    const matchedCustomer = customers.find((customer) =>
+      (service.customer_id && customer.id === service.customer_id) ||
+      (service.customer_name && customer.full_name === service.customer_name) ||
+      (service.customer_phone && customer.phone === service.customer_phone)
+    );
+
+    return service.customer_alternate_phone || matchedCustomer?.alternate_phone || '';
+  }, [customers]);
   
   // Pagination states
   const [currentPage, setCurrentPage] = React.useState<number>(1);
@@ -2059,6 +2158,13 @@ const CardTab: React.FC<CardTabProps> = ({
   const [showPaymentHistoryModal, setShowPaymentHistoryModal] = React.useState<boolean>(false);
   const [showPaymentModal, setShowPaymentModal] = React.useState<boolean>(false);
   const [paymentModalMode, setPaymentModalMode] = React.useState<'add' | 'edit'>('add');
+  const [staffSummaryMonth, setStaffSummaryMonth] = React.useState<string>(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
+  const [staffMonthlySummary, setStaffMonthlySummary] = React.useState<StaffMonthlySummaryItem[]>([]);
+  const [, setStaffMonthlyPayments] = React.useState<WaterServicePayment[]>([]);
+  const [staffSummaryLoading, setStaffSummaryLoading] = React.useState<boolean>(false);
   
   // Toast notification state
   const [toast, setToast] = React.useState<{
@@ -2103,6 +2209,30 @@ const CardTab: React.FC<CardTabProps> = ({
       setLastRefreshed(new Date());
     }
   }, [services]);
+
+  const fetchStaffMonthlySummary = React.useCallback(async (month: string) => {
+    setStaffSummaryLoading(true);
+    try {
+      const response = await fetch(`${WATER_SERVICES_URL}?action=staff_monthly_summary&month=${month}`);
+      const result = await response.json();
+      if (response.ok && result.success) {
+        setStaffMonthlySummary(result.summary || []);
+        setStaffMonthlyPayments(result.payments || []);
+      } else {
+        setStaffMonthlySummary([]);
+        setStaffMonthlyPayments([]);
+      }
+    } catch (_err) {
+      setStaffMonthlySummary([]);
+      setStaffMonthlyPayments([]);
+    } finally {
+      setStaffSummaryLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    fetchStaffMonthlySummary(staffSummaryMonth);
+  }, [staffSummaryMonth, fetchStaffMonthlySummary]);
 
   // Reset to page 1 when filters change
   React.useEffect(() => {
@@ -2202,6 +2332,7 @@ const CardTab: React.FC<CardTabProps> = ({
         service.service_code?.toLowerCase().includes(query) ||
         service.customer_name?.toLowerCase().includes(query) ||
         service.customer_phone?.includes(query) ||
+        getAlternatePhone(service)?.includes(query) ||
         service.battery_model?.toLowerCase().includes(query) ||
         service.battery_serial?.toLowerCase().includes(query) ||
         service.customer_email?.toLowerCase().includes(query)
@@ -2501,8 +2632,8 @@ const CardTab: React.FC<CardTabProps> = ({
       const isEdit = paymentData.id !== undefined;
       
       const url = isEdit 
-        ? `http://localhost/sun_office/api/water_services.php?id=${paymentData.id}`
-        : 'http://localhost/sun_office/api/water_services.php';
+        ? `${WATER_SERVICES_URL}?id=${paymentData.id}`
+        : WATER_SERVICES_URL;
       
       const method = isEdit ? 'PUT' : 'POST';
 
@@ -2522,7 +2653,7 @@ const CardTab: React.FC<CardTabProps> = ({
 
       // Show success toast notification
       showToast(
-        `✅ Payment ${isEdit ? 'updated' : 'saved'} successfully!\n` +
+        `Payment ${isEdit ? 'updated' : 'saved'} successfully.\n` +
         `Amount: ${formatCurrency(paymentData.amount)}\n` +
         `Date: ${formatDate(paymentData.service_date)}`,
         'success'
@@ -2535,11 +2666,12 @@ const CardTab: React.FC<CardTabProps> = ({
       
       // Call the onPaymentSuccess callback to refresh the parent component
       onPaymentSuccess();
+      fetchStaffMonthlySummary(staffSummaryMonth);
       
     } catch (error: any) {
       console.error('Error saving payment:', error);
       showToast(
-        `❌ Failed to save payment: ${error.message || 'Please try again.'}`,
+        `Failed to save payment: ${error.message || 'Please try again.'}`,
         'error'
       );
       throw new Error(error.message || 'Failed to save payment. Please try again.');
@@ -2549,7 +2681,7 @@ const CardTab: React.FC<CardTabProps> = ({
   // Handle payment delete
   const handlePaymentDelete = async (paymentId: number) => {
     try {
-      const response = await fetch(`http://localhost/sun_office/api/water_services.php?id=${paymentId}`, {
+      const response = await fetch(`${WATER_SERVICES_URL}?id=${paymentId}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -2563,7 +2695,7 @@ const CardTab: React.FC<CardTabProps> = ({
       }
 
       showToast(
-        `✅ Payment deleted successfully!`,
+        `Payment deleted successfully.`,
         'success'
       );
       
@@ -2571,11 +2703,12 @@ const CardTab: React.FC<CardTabProps> = ({
       if (selectedService) {
         // The modal will refresh itself
       }
+      fetchStaffMonthlySummary(staffSummaryMonth);
       
     } catch (error: any) {
       console.error('Error deleting payment:', error);
       showToast(
-        `❌ Failed to delete payment: ${error.message || 'Please try again.'}`,
+        `Failed to delete payment: ${error.message || 'Please try again.'}`,
         'error'
       );
       throw new Error(error.message || 'Failed to delete payment. Please try again.');
@@ -2680,6 +2813,7 @@ const CardTab: React.FC<CardTabProps> = ({
                 <th>Service Code</th>
                 <th>Customer</th>
                 <th>Phone</th>
+                <th>Alternate Phone</th>
                 <th>Battery Model</th>
                 <th>Warranty</th>
                 <th>AMC</th>
@@ -2695,6 +2829,7 @@ const CardTab: React.FC<CardTabProps> = ({
                     <td>${service.service_code || ''}</td>
                     <td>${service.customer_name || ''}</td>
                     <td>${service.customer_phone || ''}</td>
+                    <td>${getAlternatePhone(service) || ''}</td>
                     <td>${service.battery_model || ''}</td>
                     <td><span style="background: ${warrantyInfo.bg}; color: ${warrantyInfo.text}; padding: 4px 8px; border-radius: 4px;">${warrantyInfo.label}</span></td>
                     <td><span style="background: ${amcInfo.bg}; color: ${amcInfo.text}; padding: 4px 8px; border-radius: 4px;">${amcInfo.label}</span></td>
@@ -2778,6 +2913,7 @@ const CardTab: React.FC<CardTabProps> = ({
         'Service Code',
         'Customer Name',
         'Customer Phone',
+        'Alternate Phone',
         'Customer Email',
         'Battery Model',
         'Battery Serial',
@@ -2801,6 +2937,7 @@ const CardTab: React.FC<CardTabProps> = ({
           `"${(service.service_code || '').replace(/"/g, '""')}"`,
           `"${(service.customer_name || '').replace(/"/g, '""')}"`,
           `"${(service.customer_phone || '').replace(/"/g, '""')}"`,
+          `"${(getAlternatePhone(service) || '').replace(/"/g, '""')}"`,
           `"${(service.customer_email || '').replace(/"/g, '""')}"`,
           `"${(service.battery_model || '').replace(/"/g, '""')}"`,
           `"${(service.battery_serial || '').replace(/"/g, '""')}"`,
@@ -2834,14 +2971,14 @@ const CardTab: React.FC<CardTabProps> = ({
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
       
-      showToast(`✅ Exported ${dataToExport.length} water service records to CSV`, 'success');
+      showToast(`Exported ${dataToExport.length} water service records to CSV.`, 'success');
       
       if (selectedOnly && isMobile) {
         setShowMobileActions(false);
       }
     } catch (error) {
       console.error('Error exporting to CSV:', error);
-      showToast(`❌ Failed to export to CSV. Please try again.`, 'error');
+      showToast(`Failed to export to CSV. Please try again.`, 'error');
     } finally {
       setExportLoading(false);
     }
@@ -2942,7 +3079,7 @@ const CardTab: React.FC<CardTabProps> = ({
       // Prepare table data - REMOVED Final Cost
       const tableColumn = isMobile 
         ? ['Code', 'Customer', 'Model']
-        : ['Code', 'Customer', 'Phone', 'Battery Model', 'Warranty', 'AMC', 'Created'];
+        : ['Code', 'Customer', 'Phone', 'Alternate Phone', 'Battery Model', 'Warranty', 'AMC', 'Created'];
 
       const tableRows = dataToExport.map(service => {
         const warrantyInfo = getWarrantyInfo(service.warranty_status);
@@ -2960,6 +3097,7 @@ const CardTab: React.FC<CardTabProps> = ({
           service.service_code || '',
           service.customer_name || '',
           service.customer_phone || '',
+          getAlternatePhone(service) || '',
           service.battery_model || '',
           warrantyInfo.label,
           amcInfo.label,
@@ -3041,14 +3179,14 @@ const CardTab: React.FC<CardTabProps> = ({
       
       doc.save(fileName);
       
-      showToast(`✅ Exported ${dataToExport.length} water service records to PDF`, 'success');
+      showToast(`Exported ${dataToExport.length} water service records to PDF.`, 'success');
       
       if (selectedOnly && isMobile) {
         setShowMobileActions(false);
       }
     } catch (error) {
       console.error('Error exporting to PDF:', error);
-      showToast(`❌ Failed to export to PDF. Please try again.`, 'error');
+      showToast(`Failed to export to PDF. Please try again.`, 'error');
     } finally {
       setExportLoading(false);
     }
@@ -3130,6 +3268,11 @@ const CardTab: React.FC<CardTabProps> = ({
             <div style={{ fontSize: '12px', color: '#6b7280', display: 'flex', alignItems: 'center', gap: '4px' }}>
               <FiPhone size={10} /> {service.customer_phone || 'No phone'}
             </div>
+            {getAlternatePhone(service) && (
+              <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px' }}>
+                Alt: {getAlternatePhone(service)}
+              </div>
+            )}
           </div>
           <div>
             <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '4px' }}>Battery Info</div>
@@ -3732,6 +3875,72 @@ const CardTab: React.FC<CardTabProps> = ({
             </div>
           </div>
         )}
+
+        {/* Staff Monthly Payment Summary */}
+        <div style={{
+          padding: isMobile ? '12px 16px' : '16px 24px',
+          backgroundColor: '#f0fdf4',
+          borderBottom: '1px solid #dcfce7'
+        }}>
+          <div style={{
+            display: 'flex',
+            alignItems: isMobile ? 'stretch' : 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+            flexDirection: isMobile ? 'column' : 'row',
+            marginBottom: '12px'
+          }}>
+            <h3 style={{ margin: 0, fontSize: '16px', color: '#065f46' }}>
+              Staff Payment Summary (Month Wise)
+            </h3>
+            <input
+              type="month"
+              value={staffSummaryMonth}
+              onChange={(e) => setStaffSummaryMonth(e.target.value)}
+              style={{
+                padding: '8px 12px',
+                borderRadius: '8px',
+                border: '1px solid #86efac',
+                backgroundColor: '#fff',
+                fontSize: '14px',
+                outline: 'none'
+              }}
+            />
+          </div>
+
+          {staffSummaryLoading ? (
+            <p style={{ margin: 0, color: '#166534', fontSize: '13px' }}>Loading monthly staff summary...</p>
+          ) : (
+            <>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))',
+                gap: '10px',
+                marginBottom: '12px'
+              }}>
+                {staffMonthlySummary.length > 0 ? staffMonthlySummary.map((item, idx) => (
+                  <div key={`${item.service_staff_id || 'none'}-${idx}`} style={{
+                    backgroundColor: '#fff',
+                    border: '1px solid #bbf7d0',
+                    borderRadius: '10px',
+                    padding: '10px'
+                  }}>
+                    <div style={{ fontSize: '13px', color: '#065f46', fontWeight: 600 }}>{item.service_staff_name || 'Unassigned'}</div>
+                    <div style={{ fontSize: '12px', color: '#166534', marginTop: '4px' }}>
+                      Services: {item.service_count}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#166534' }}>
+                      Amount: {formatCurrency(item.total_amount)}
+                    </div>
+                  </div>
+                )) : (
+                  <div style={{ fontSize: '13px', color: '#166534' }}>No staff payments for selected month.</div>
+                )}
+              </div>
+
+            </>
+          )}
+        </div>
 
         {/* Filter Options */}
         {showFilters && (
@@ -4347,6 +4556,11 @@ const CardTab: React.FC<CardTabProps> = ({
                               <FiPhone size={isTablet ? 11 : 12} />
                               <span style={{ fontSize: isTablet ? '12px' : '13px' }}>{service.customer_phone}</span>
                             </div>
+                            {getAlternatePhone(service) && (
+                              <div style={{ fontSize: isTablet ? '10px' : '11px', color: '#94a3b8', marginTop: '4px' }}>
+                                Alt: {getAlternatePhone(service)}
+                              </div>
+                            )}
                           </td>
                           <td style={{ padding: isTablet ? '12px' : '14px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

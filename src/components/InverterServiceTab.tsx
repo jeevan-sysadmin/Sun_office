@@ -161,6 +161,34 @@ const InverterServiceTab: React.FC<InverterServiceTabProps> = ({
     return `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
   };
 
+  const getServiceInverters = (service: InverterService) => {
+    return Array.isArray(service.inverters) ? service.inverters : [];
+  };
+
+  const getInverterModelsText = (service: InverterService) => {
+    const models = getServiceInverters(service)
+      .map((inv) => inv?.inverter_model)
+      .filter(Boolean) as string[];
+    if (models.length > 0) return models.join(", ");
+    return service.inverter_model || "N/A";
+  };
+
+  const getInverterSerialsText = (service: InverterService) => {
+    const serials = getServiceInverters(service)
+      .map((inv) => inv?.inverter_serial)
+      .filter(Boolean) as string[];
+    if (serials.length > 0) return serials.join(", ");
+    return service.inverter_serial || "";
+  };
+
+  const getInverterBrandsText = (service: InverterService) => {
+    const brands = getServiceInverters(service)
+      .map((inv) => inv?.inverter_brand)
+      .filter(Boolean) as string[];
+    if (brands.length > 0) return Array.from(new Set(brands)).join(", ");
+    return service.inverter_brand || "";
+  };
+
   // Set default from and to dates for custom range
   const setDefaultCustomRange = () => {
     const today = new Date();
@@ -240,9 +268,9 @@ const InverterServiceTab: React.FC<InverterServiceTabProps> = ({
         (service.service_code && service.service_code.toLowerCase().includes(searchLower)) ||
         (service.customer_name && service.customer_name.toLowerCase().includes(searchLower)) ||
         (service.customer_phone && service.customer_phone.includes(searchTerm)) ||
-        (service.inverter_model && service.inverter_model.toLowerCase().includes(searchLower)) ||
-        (service.inverter_serial && service.inverter_serial.toLowerCase().includes(searchLower)) ||
-        (service.inverter_brand && service.inverter_brand.toLowerCase().includes(searchLower)) ||
+        (getInverterModelsText(service).toLowerCase().includes(searchLower)) ||
+        (getInverterSerialsText(service).toLowerCase().includes(searchLower)) ||
+        (getInverterBrandsText(service).toLowerCase().includes(searchLower)) ||
         (service.issue_description && service.issue_description.toLowerCase().includes(searchLower))
       );
     }
@@ -428,9 +456,9 @@ const InverterServiceTab: React.FC<InverterServiceTabProps> = ({
         {
           title: "Inverter Details",
           fields: [
-            { label: "Brand", value: service.inverter_brand || 'N/A' },
-            { label: "Model", value: service.inverter_model || 'N/A' },
-            { label: "Serial Number", value: service.inverter_serial || null },
+            { label: "Brand", value: getInverterBrandsText(service) || 'N/A' },
+            { label: "Model", value: getInverterModelsText(service) || 'N/A' },
+            { label: "Serial Number", value: getInverterSerialsText(service) || null },
             { label: "Power Rating", value: service.inverter_power_rating || 'N/A' },
             { label: "Inverter Type", value: formatReceiptLabel(service.inverter_type) || null },
           ],
@@ -576,7 +604,7 @@ const InverterServiceTab: React.FC<InverterServiceTabProps> = ({
                     <td>${service.service_code || ''}</td>
                     <td>${service.customer_name || ''}</td>
                     <td>${service.customer_phone || ''}</td>
-                    <td>${service.inverter_model || 'N/A'}</td>
+                    <td>${getInverterModelsText(service) || 'N/A'}</td>
                     <td>${formatDate(service.created_at)}</td>
                   </tr>
                 `;
@@ -651,9 +679,9 @@ const InverterServiceTab: React.FC<InverterServiceTabProps> = ({
           `"${(service.customer_phone || '').replace(/"/g, '""')}"`,
           `"${(service.customer_email || '').replace(/"/g, '""')}"`,
           `"${(service.customer_address || '').replace(/"/g, '""')}"`,
-          `"${(service.inverter_model || '').replace(/"/g, '""')}"`,
-          `"${(service.inverter_serial || '').replace(/"/g, '""')}"`,
-          `"${(service.inverter_brand || '').replace(/"/g, '""')}"`,
+          `"${(getInverterModelsText(service) || '').replace(/"/g, '""')}"`,
+          `"${(getInverterSerialsText(service) || '').replace(/"/g, '""')}"`,
+          `"${(getInverterBrandsText(service) || '').replace(/"/g, '""')}"`,
           `"${(service.inverter_power_rating || '').replace(/"/g, '""')}"`,
           `"${(service.inverter_type || '').replace(/"/g, '""')}"`,
           `"${(service.inverter_wave_type || '').replace(/"/g, '""')}"`,
@@ -782,7 +810,7 @@ const InverterServiceTab: React.FC<InverterServiceTabProps> = ({
           return [
             service.service_code || '',
             service.customer_name || '',
-            service.inverter_model || 'N/A',
+            getInverterModelsText(service) || 'N/A',
             formatDate(service.created_at)
           ];
         }
@@ -790,7 +818,7 @@ const InverterServiceTab: React.FC<InverterServiceTabProps> = ({
           service.service_code || '',
           service.customer_name || '',
           service.customer_phone || '',
-          service.inverter_model || 'N/A',
+          getInverterModelsText(service) || 'N/A',
           formatDate(service.created_at)
         ];
       });
@@ -1039,8 +1067,8 @@ const InverterServiceTab: React.FC<InverterServiceTabProps> = ({
               {getEquipmentIcon(service)}
             </div>
             <div>
-              <div style={{ fontWeight: '500', fontSize: '14px' }}>{service.inverter_model || 'N/A'}</div>
-              <div style={{ fontSize: '10px', color: '#6b7280' }}>{service.inverter_serial || 'No serial'}</div>
+              <div style={{ fontWeight: '500', fontSize: '14px' }}>{getInverterModelsText(service) || 'N/A'}</div>
+              <div style={{ fontSize: '10px', color: '#6b7280' }}>{getInverterSerialsText(service) || 'No serial'}</div>
             </div>
           </div>
         </div>
@@ -1952,6 +1980,15 @@ const InverterServiceTab: React.FC<InverterServiceTabProps> = ({
                     }}>Status</th>
                     <th style={{
                       padding: isTablet ? '12px' : '14px',
+                      textAlign: 'left',
+                      fontWeight: '600',
+                      color: '#ffffff',
+                      fontSize: isTablet ? '11px' : '12px',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
+                    }}>Date</th>
+                    <th style={{
+                      padding: isTablet ? '12px' : '14px',
                       textAlign: 'center',
                       fontWeight: '600',
                       color: '#ffffff',
@@ -2042,14 +2079,14 @@ const InverterServiceTab: React.FC<InverterServiceTabProps> = ({
                           </div>
                           <div>
                             <div style={{ fontWeight: '500', color: '#111827', marginBottom: '2px', fontSize: isTablet ? '13px' : '14px' }}>
-                              {service.inverter_model || 'N/A'}
+                              {getInverterModelsText(service) || 'N/A'}
                             </div>
                             <div style={{ fontSize: isTablet ? '10px' : '11px', color: '#6b7280', fontFamily: 'monospace' }}>
-                              {service.inverter_serial || 'No serial'}
+                              {getInverterSerialsText(service) || 'No serial'}
                             </div>
-                            {service.inverter_brand && (
+                            {getInverterBrandsText(service) && (
                               <div style={{ fontSize: isTablet ? '9px' : '10px', color: '#94a3b8' }}>
-                                {service.inverter_brand}
+                                {getInverterBrandsText(service)}
                               </div>
                             )}
                           </div>
@@ -2067,6 +2104,9 @@ const InverterServiceTab: React.FC<InverterServiceTabProps> = ({
                         }}>
                           {service.status?.replace(/_/g, ' ') || 'pending'}
                         </span>
+                      </td>
+                      <td style={{ padding: isTablet ? '12px' : '14px', color: '#374151', fontSize: isTablet ? '12px' : '13px' }}>
+                        {formatDate(service.created_at)}
                       </td>
                       <td style={{ padding: isTablet ? '12px' : '14px' }}>
                         <div style={{

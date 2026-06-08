@@ -392,7 +392,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       }}
     >
       <motion.div 
-        className="modal-content product-detail-modal"
+        className={`modal-content product-detail-modal ${isBattery(product) ? 'battery-theme' : 'inverter-theme'}`}
         initial={{ 
           opacity: 0, 
           scale: isMobile ? 1 : 0.9, 
@@ -645,6 +645,56 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               </span>
             </div>
           </div>
+
+          {isBattery(product) && (
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)',
+                gap: isMobile ? '10px' : '14px',
+                marginBottom: '22px'
+              }}
+            >
+              <div style={{
+                background: 'linear-gradient(135deg, #e0f2fe 0%, #f8fafc 100%)',
+                border: '1px solid #bfdbfe',
+                borderRadius: '12px',
+                padding: isMobile ? '12px' : '14px'
+              }}>
+                <div style={{ fontSize: getFontSize('small'), color: '#475569', marginBottom: '4px' }}>Capacity</div>
+                <div style={{ fontSize: getFontSize('h3'), fontWeight: 700, color: '#0c4a6e' }}>{product.capacity || 'N/A'}</div>
+              </div>
+              <div style={{
+                background: 'linear-gradient(135deg, #dcfce7 0%, #f8fafc 100%)',
+                border: '1px solid #bbf7d0',
+                borderRadius: '12px',
+                padding: isMobile ? '12px' : '14px'
+              }}>
+                <div style={{ fontSize: getFontSize('small'), color: '#475569', marginBottom: '4px' }}>Voltage</div>
+                <div style={{ fontSize: getFontSize('h3'), fontWeight: 700, color: '#14532d' }}>{product.voltage || 'N/A'}</div>
+              </div>
+              <div style={{
+                background: 'linear-gradient(135deg, #fef3c7 0%, #f8fafc 100%)',
+                border: '1px solid #fde68a',
+                borderRadius: '12px',
+                padding: isMobile ? '12px' : '14px'
+              }}>
+                <div style={{ fontSize: getFontSize('small'), color: '#475569', marginBottom: '4px' }}>Condition</div>
+                <div style={{ fontSize: getFontSize('h3'), fontWeight: 700, color: '#92400e' }}>
+                  {(product.battery_condition || 'N/A').replace(/_/g, ' ').toUpperCase()}
+                </div>
+              </div>
+              <div style={{
+                background: 'linear-gradient(135deg, #ede9fe 0%, #f8fafc 100%)',
+                border: '1px solid #ddd6fe',
+                borderRadius: '12px',
+                padding: isMobile ? '12px' : '14px'
+              }}>
+                <div style={{ fontSize: getFontSize('small'), color: '#475569', marginBottom: '4px' }}>Total Services</div>
+                <div style={{ fontSize: getFontSize('h3'), fontWeight: 700, color: '#4c1d95' }}>{product.total_services ?? 0}</div>
+              </div>
+            </div>
+          )}
 
           {/* Details Grid */}
           <div 
@@ -1710,6 +1760,149 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         
         .spinning {
           animation: spin 1s linear infinite;
+        }
+
+        /* Battery Detail Full Theme */
+        .product-detail-modal.battery-theme {
+          background: linear-gradient(180deg, #f8fbff 0%, #f3f7ff 100%);
+        }
+
+        .product-detail-modal.battery-theme .modal-header {
+          background: linear-gradient(135deg, #0f4c81 0%, #2563eb 48%, #22c1c3 100%) !important;
+          color: #ffffff !important;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.18) !important;
+        }
+
+        .product-detail-modal.battery-theme .modal-header h2,
+        .product-detail-modal.battery-theme .modal-header p {
+          color: #ffffff !important;
+        }
+
+        .product-detail-modal.battery-theme .close-btn {
+          background: rgba(255, 255, 255, 0.22) !important;
+          color: #ffffff !important;
+          border: 1px solid rgba(255, 255, 255, 0.3) !important;
+        }
+
+        .product-detail-modal.battery-theme .product-detail-content {
+          background:
+            radial-gradient(circle at 10% 0%, rgba(59, 130, 246, 0.10), transparent 35%),
+            radial-gradient(circle at 90% 10%, rgba(34, 197, 94, 0.10), transparent 30%),
+            #f8fafc !important;
+        }
+
+        .product-detail-modal.battery-theme .summary-card {
+          border: 1px solid #bfdbfe !important;
+          box-shadow: 0 8px 22px rgba(37, 99, 235, 0.12) !important;
+          background: linear-gradient(135deg, #ffffff 0%, #eef6ff 100%) !important;
+        }
+
+        .product-detail-modal.battery-theme .status-badge {
+          box-shadow: 0 4px 12px rgba(15, 76, 129, 0.12);
+        }
+
+        .product-detail-modal.battery-theme .detail-section {
+          border: 1px solid #dbeafe !important;
+          box-shadow: 0 6px 18px rgba(15, 76, 129, 0.08) !important;
+          background: linear-gradient(180deg, #ffffff 0%, #f9fbff 100%) !important;
+        }
+
+        .product-detail-modal.battery-theme .detail-section:hover {
+          border-color: #60a5fa !important;
+          box-shadow: 0 12px 26px rgba(37, 99, 235, 0.16) !important;
+          transform: translateY(-4px);
+        }
+
+        .product-detail-modal.battery-theme .detail-label {
+          color: #64748b !important;
+        }
+
+        .product-detail-modal.battery-theme .detail-value {
+          color: #0f172a !important;
+          font-weight: 600;
+        }
+
+        .product-detail-modal.battery-theme .btn.primary {
+          background: linear-gradient(135deg, #2563eb 0%, #0f4c81 100%) !important;
+          border: 1px solid #1d4ed8 !important;
+        }
+
+        .product-detail-modal.battery-theme .btn.outline {
+          border-color: #93c5fd !important;
+          color: #1e3a8a !important;
+          background: #ffffff;
+        }
+
+        /* Inverter Detail Full Theme */
+        .product-detail-modal.inverter-theme {
+          background: linear-gradient(180deg, #fff9f1 0%, #fffaf5 100%);
+        }
+
+        .product-detail-modal.inverter-theme .modal-header {
+          background: linear-gradient(135deg, #7c2d12 0%, #ea580c 45%, #f59e0b 100%) !important;
+          color: #ffffff !important;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.18) !important;
+        }
+
+        .product-detail-modal.inverter-theme .modal-header h2,
+        .product-detail-modal.inverter-theme .modal-header p {
+          color: #ffffff !important;
+        }
+
+        .product-detail-modal.inverter-theme .close-btn {
+          background: rgba(255, 255, 255, 0.22) !important;
+          color: #ffffff !important;
+          border: 1px solid rgba(255, 255, 255, 0.3) !important;
+        }
+
+        .product-detail-modal.inverter-theme .product-detail-content {
+          background:
+            radial-gradient(circle at 12% 0%, rgba(245, 158, 11, 0.14), transparent 35%),
+            radial-gradient(circle at 88% 10%, rgba(234, 88, 12, 0.12), transparent 30%),
+            #fffaf5 !important;
+        }
+
+        .product-detail-modal.inverter-theme .summary-card {
+          border: 1px solid #fed7aa !important;
+          box-shadow: 0 8px 22px rgba(234, 88, 12, 0.12) !important;
+          background: linear-gradient(135deg, #ffffff 0%, #fff3e0 100%) !important;
+        }
+
+        .product-detail-modal.inverter-theme .status-badge {
+          box-shadow: 0 4px 12px rgba(124, 45, 18, 0.12);
+        }
+
+        .product-detail-modal.inverter-theme .detail-section {
+          border: 1px solid #fdba74 !important;
+          box-shadow: 0 6px 18px rgba(124, 45, 18, 0.08) !important;
+          background: linear-gradient(180deg, #ffffff 0%, #fff9f2 100%) !important;
+        }
+
+        .product-detail-modal.inverter-theme .detail-section:hover {
+          border-color: #fb923c !important;
+          box-shadow: 0 12px 26px rgba(234, 88, 12, 0.16) !important;
+          transform: translateY(-4px);
+        }
+
+        .product-detail-modal.inverter-theme .detail-label {
+          color: #7c2d12 !important;
+          opacity: 0.78;
+        }
+
+        .product-detail-modal.inverter-theme .detail-value {
+          color: #431407 !important;
+          font-weight: 600;
+        }
+
+        .product-detail-modal.inverter-theme .btn.primary {
+          background: linear-gradient(135deg, #ea580c 0%, #9a3412 100%) !important;
+          border: 1px solid #c2410c !important;
+        }
+
+        .product-detail-modal.inverter-theme .btn.outline {
+          border-color: #fdba74 !important;
+          color: #9a3412 !important;
+          background: #ffffff;
         }
       `}</style>
     </motion.div>

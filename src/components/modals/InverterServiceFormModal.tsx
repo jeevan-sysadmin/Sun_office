@@ -16,6 +16,7 @@ import {
   FiSearch,
   FiChevronDown
 } from "react-icons/fi";
+import { API_BASE_URL } from "../../config/api";
 
 // Interfaces
 interface Customer {
@@ -74,6 +75,7 @@ interface InverterServiceForm {
   customer_id: number | null;
   customer_phone: string;
   inverter_id: number | null;
+  inverter_ids?: number[];
   service_staff_id: number | null;
   issue_description: string;
   warranty_status: string;
@@ -504,8 +506,6 @@ const InverterServiceFormModal: React.FC<InverterServiceFormModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   
-  const API_BASE_URL = "http://localhost/sun_office/api";
-
   // Fetch customers from API
   const fetchCustomers = async () => {
     try {
@@ -710,17 +710,24 @@ const InverterServiceFormModal: React.FC<InverterServiceFormModalProps> = ({
   // Handle inverter selection change - FIXED to handle empty values
   const handleInverterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const inverterId = e.target.value ? parseInt(e.target.value) : null;
-    
-    // Create a synthetic event for inverter_id
-    const inverterIdEvent = {
+
+    const currentIds = Array.isArray(serviceForm.inverter_ids)
+      ? serviceForm.inverter_ids.map((id) => Number(id)).filter((id) => !isNaN(id) && id > 0)
+      : (serviceForm.inverter_id ? [Number(serviceForm.inverter_id)] : []);
+
+    const nextIds = inverterId && !currentIds.includes(inverterId)
+      ? [...currentIds, inverterId]
+      : currentIds;
+
+    const inverterIdsEvent = {
       target: {
-        name: 'inverter_id',
-        value: inverterId ? inverterId.toString() : ''
+        name: 'inverter_ids',
+        value: JSON.stringify(nextIds)
       }
     } as React.ChangeEvent<HTMLInputElement>;
-    
-    onServiceInputChange(inverterIdEvent);
-    
+
+    onServiceInputChange(inverterIdsEvent);
+
     if (inverterId && !isNaN(inverterId) && !editMode) {
       const selectedInverter = localInverters.find(i => i.id === inverterId);
       if (selectedInverter) {
@@ -926,6 +933,26 @@ const InverterServiceFormModal: React.FC<InverterServiceFormModalProps> = ({
     return `${brand} ${model}${serial}${code}`;
   };
 
+  const selectedInverterCard = localInverters.find((inverter) => {
+    if (!serviceForm.inverter_id) return false;
+    return inverter.id === Number(serviceForm.inverter_id);
+  });
+  const selectedInverterIds = Array.isArray(serviceForm.inverter_ids)
+    ? serviceForm.inverter_ids.map((id) => Number(id)).filter((id) => !isNaN(id) && id > 0)
+    : (serviceForm.inverter_id ? [Number(serviceForm.inverter_id)] : []);
+  const selectedInverterCards = localInverters.filter((inverter) => selectedInverterIds.includes(inverter.id));
+  const removeSelectedInverter = (inverterId: number) => {
+    const nextIds = selectedInverterIds.filter((id) => id !== inverterId);
+    const inverterIdsEvent = {
+      target: {
+        name: 'inverter_ids',
+        value: JSON.stringify(nextIds)
+      }
+    } as React.ChangeEvent<HTMLInputElement>;
+    onServiceInputChange(inverterIdsEvent);
+  };
+  void selectedInverterCard;
+
   const renderServiceForm = () => (
     <form onSubmit={handleFormSubmit} className="service-form">
       {error && (
@@ -1060,8 +1087,8 @@ const InverterServiceFormModal: React.FC<InverterServiceFormModalProps> = ({
         {/* Inverter Selection - Searchable Dropdown - NOW OPTIONAL with proper label function */}
         <SearchableDropdown
           id="inverter_id"
-          name="inverter_id"
-          value={serviceForm.inverter_id || ""}
+          name="inverter_picker"
+          value=""
           onChange={handleInverterChange}
           options={localInverters}
           optionLabel={getInverterLabel}
@@ -1076,6 +1103,54 @@ const InverterServiceFormModal: React.FC<InverterServiceFormModalProps> = ({
           isMobile={isMobile}
           allowEmpty={true}
         />
+        {selectedInverterCards.length > 0 && (
+          <div style={{
+            marginTop: '-8px',
+            marginBottom: '18px',
+            display: 'grid',
+            gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+            gap: '10px'
+          }}>
+            {selectedInverterCards.map((card) => (
+              <div
+                key={card.id}
+                style={{
+                  border: '2px solid #10b981',
+                  borderRadius: '12px',
+                  background: 'linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%)',
+                  padding: '12px'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                  <div style={{ fontWeight: 600, color: '#064e3b', fontSize: '13px' }}>
+                    {card.inverter_model || 'Unknown Model'}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeSelectedInverter(card.id)}
+                    style={{
+                      border: 'none',
+                      background: 'transparent',
+                      color: '#047857',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                    title="Remove"
+                  >
+                    <FiX size={15} />
+                  </button>
+                </div>
+                <div style={{ fontSize: '12px', color: '#065f46' }}>
+                  Serial: {card.inverter_serial || 'N/A'}
+                </div>
+                <div style={{ fontSize: '11px', color: '#047857', marginTop: '2px' }}>
+                  Code: {card.inverter_code || `INV${card.id}`}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Service Staff Selection - Searchable Dropdown - Optional */}
         <SearchableDropdown

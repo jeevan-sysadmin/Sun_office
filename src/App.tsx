@@ -1,9 +1,9 @@
 // C:\Users\JEEVANLAROSH\Downloads\Sun computers\sun office\src\App.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import Login from "./components/Login";
-import Dashboard from "./components/Dashboard";
 import type { User as DashboardUser } from "./components/types";
+const Login = lazy(() => import("./components/Login"));
+const Dashboard = lazy(() => import("./components/Dashboard"));
 
 
 // Type for user data from database (matches Login component's User type)
@@ -433,6 +433,29 @@ function App() {
   return (
     <ErrorBoundary>
       <Router>
+        <Suspense
+          fallback={
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minHeight: '100vh',
+              backgroundColor: '#f9fafb'
+            }}>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{
+                  animation: 'spin 1s linear infinite',
+                  borderRadius: '50%',
+                  height: '48px',
+                  width: '48px',
+                  borderBottom: '2px solid #3b82f6',
+                  margin: '0 auto'
+                }}></div>
+                <p style={{ marginTop: '16px', color: '#4b5563' }}>Loading page...</p>
+              </div>
+            </div>
+          }
+        >
         <div className="App">
           {/* Development tools - only shown in development mode */}
           {import.meta.env.DEV && showDevTools && (
@@ -575,6 +598,7 @@ function App() {
             />
           </Routes>
         </div>
+        </Suspense>
       </Router>
     </ErrorBoundary>
   );

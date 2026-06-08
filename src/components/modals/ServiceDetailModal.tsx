@@ -223,6 +223,7 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
         fields: [
           { label: "Customer Name", value: service.customer_name },
           { label: "Phone Number", value: service.customer_phone },
+          { label: "Alternate Phone", value: service.customer_alternate_phone || null },
           { label: "Email Address", value: service.customer_email || null },
           {
             label: "Address",
@@ -1195,6 +1196,27 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
                     </span>
                   </div>
                 </div>
+                {service.customer_alternate_phone && (
+                  <div>
+                    <div style={{ color: '#6b7280', fontSize: '13px', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <FiPhone size={12} /> Alternate Phone
+                    </div>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      background: '#f9fafb',
+                      padding: '10px 14px',
+                      borderRadius: '12px',
+                      border: '1px solid #f3f4f6'
+                    }}>
+                      <FiPhone size={16} color="#4f46e5" />
+                      <span style={{ color: '#111827', fontSize: isMobile ? '15px' : '16px', fontWeight: '500' }}>
+                        {service.customer_alternate_phone}
+                      </span>
+                    </div>
+                  </div>
+                )}
                 {service.customer_email && (
                   <div>
                     <div style={{ color: '#6b7280', fontSize: '13px', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
