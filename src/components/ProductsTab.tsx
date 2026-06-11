@@ -185,10 +185,10 @@ const ProductsTab: React.FC<ProductsTabProps> = ({
 
   // Pagination logic
   const totalItems = currentItems.length;
-  const totalPages = Math.ceil(totalItems / itemsPerPage);
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const displayItems = currentItems.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = totalItems > 0 ? 1 : 0;
+  const indexOfLastItem = totalItems;
+  const indexOfFirstItem = 0;
+  const displayItems = currentItems;
 
   // Pagination handlers
   const goToPage = (page: number) => {
@@ -1837,7 +1837,7 @@ const ProductsTab: React.FC<ProductsTabProps> = ({
               fontSize: isMobile ? '12px' : '12px',
               color: '#6b7280'
             }}>
-              Showing <strong>{indexOfFirstItem + 1}-{Math.min(indexOfLastItem, totalItems)}</strong> of <strong>{totalItems}</strong> {activeTab}
+              Showing <strong>all {totalItems}</strong> {activeTab}
             </span>
             
             {localSearchTerm && (
@@ -2326,7 +2326,7 @@ const ProductsTab: React.FC<ProductsTabProps> = ({
             fontSize: isMobile ? '13px' : '14px',
             order: isMobile ? 2 : 1
           }}>
-            Showing <strong>{indexOfFirstItem + 1}-{Math.min(indexOfLastItem, totalItems)}</strong> of <strong>{totalItems}</strong> results
+            Showing <strong>all {totalItems}</strong> results
           </div>
           
           <div style={{

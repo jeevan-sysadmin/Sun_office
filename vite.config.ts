@@ -4,7 +4,7 @@ import path from 'path'
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
-  const apiBaseUrl = env.VITE_API_BASE_URL || "http://localhost/sun_office/api";
+  const apiBaseUrl = env.VITE_API_BASE_URL || "http://cloud.anyrdp.in:3000/sun_office/api";
 
   return {
     plugins: [

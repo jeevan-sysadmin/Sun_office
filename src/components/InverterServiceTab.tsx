@@ -91,7 +91,6 @@ const InverterServiceTab: React.FC<InverterServiceTabProps> = ({
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const [itemsPerPage] = useState<number>(20); // Default 20 items per page
 
   // Handle resize
   useEffect(() => {
@@ -287,10 +286,10 @@ const InverterServiceTab: React.FC<InverterServiceTabProps> = ({
   
   // Pagination logic
   const totalItems = allFilteredServices.length;
-  const totalPages = Math.ceil(totalItems / itemsPerPage);
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const displayServices = allFilteredServices.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = totalItems > 0 ? 1 : 0;
+  const indexOfLastItem = totalItems;
+  const indexOfFirstItem = 0;
+  const displayServices = allFilteredServices;
 
   // Pagination handlers
   const goToPage = (page: number) => {
@@ -1845,7 +1844,7 @@ const InverterServiceTab: React.FC<InverterServiceTabProps> = ({
               fontSize: isMobile ? '12px' : '12px',
               color: '#6b7280'
             }}>
-              Showing <strong>{indexOfFirstItem + 1}-{Math.min(indexOfLastItem, totalItems)}</strong> of <strong>{totalItems}</strong> service calls
+              Showing <strong>all {totalItems}</strong> service calls
             </span>
             
             {searchTerm && (
@@ -2300,7 +2299,7 @@ const InverterServiceTab: React.FC<InverterServiceTabProps> = ({
             fontSize: isMobile ? '13px' : '14px',
             order: isMobile ? 2 : 1
           }}>
-            Showing <strong>{indexOfFirstItem + 1}-{Math.min(indexOfLastItem, totalItems)}</strong> of <strong>{totalItems}</strong> results
+            Showing <strong>all {totalItems}</strong> results
           </div>
           
           <div style={{

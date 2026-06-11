@@ -249,6 +249,29 @@ const parseIsSpare = (value: any): boolean => {
   return Boolean(value);
 };
 
+const parseIdArray = (value: any): number[] => {
+  if (Array.isArray(value)) {
+    return value
+      .map((id: any) => parseInt(id, 10))
+      .filter((id: number) => Number.isInteger(id) && id > 0);
+  }
+
+  if (typeof value === 'string' && value.trim() !== '') {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) {
+        return parsed
+          .map((id: any) => parseInt(id, 10))
+          .filter((id: number) => Number.isInteger(id) && id > 0);
+      }
+    } catch {
+      return [];
+    }
+  }
+
+  return [];
+};
+
 // Enhanced search function for comprehensive search across all data types
 const searchAcrossAllFields = (item: any, searchTerm: string, itemType: string): boolean => {
   if (!searchTerm || searchTerm.trim() === '') return true;
@@ -1300,7 +1323,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
   // Load services from API
   const loadServices = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/services.php`, {
+      const response = await fetch(`${API_BASE_URL}/services.php?limit=10000&page=1`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -1320,6 +1343,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
           const inverters = Array.isArray(service.inverters) ? service.inverters : [];
           const firstBattery = batteries[0] || {};
           const firstInverter = inverters[0] || {};
+          const batteryIds = parseIdArray(service.battery_ids);
+          const inverterIds = parseIdArray(service.inverter_ids);
 
           return ({
           id: parseInt(service.id),
@@ -1331,7 +1356,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
           customer_email: service.customer_email || '',
           customer_address: service.customer_address || '',
           battery_id: parseInt(service.battery_id || '0'),
-          battery_ids: Array.isArray(service.battery_ids) ? service.battery_ids.map((id: any) => parseInt(id)) : [],
+          battery_ids: batteryIds,
           batteries,
           battery_model: service.battery_model || firstBattery.battery_model || '',
           battery_serial: service.battery_serial || firstBattery.battery_serial || '',
@@ -1341,7 +1366,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
           battery_type: service.battery_type || firstBattery.battery_type || '',
           inverter_model: service.inverter_model || firstInverter.inverter_model || '',
           inverter_id: parseInt(service.inverter_id || '0'),
-          inverter_ids: Array.isArray(service.inverter_ids) ? service.inverter_ids.map((id: any) => parseInt(id)) : [],
+          inverter_ids: inverterIds,
           inverters,
           inverter_serial: service.inverter_serial || firstInverter.inverter_serial || '',
           issue_description: service.issue_description || '',
@@ -3522,6 +3547,12 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
               dashboardStats={dashboardStats}
               selectedFinancialMonth={selectedFinancialMonth}
               onFinancialMonthChange={setSelectedFinancialMonth}
+              onOpenDashboardOverview={() => handleNavItemClick('overall_report')}
+              onOpenFinancialOverview={() => handleNavItemClick('revenue')}
+              onOpenCustomersPage={() => handleNavItemClick('customers')}
+              onOpenServicesPage={() => handleNavItemClick('services')}
+              onOpenProductsPage={() => handleNavItemClick('products')}
+              onOpenStaffPage={() => handleNavItemClick('staff')}
               recentServices={recentServices.slice(0, 5)}
               activities={activities}
               getStatusColor={getStatusColor}
@@ -3538,7 +3569,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
           {/* Battery Services Tab - Table View Only */}
           {activeTab === 'services' && (
             <ServicesTab
-              services={filteredServices}
+              services={services}
               filteredServices={filteredServices}
               customers={customers}
               filterStatus={filterStatus}

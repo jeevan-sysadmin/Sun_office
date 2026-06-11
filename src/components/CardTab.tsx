@@ -79,6 +79,11 @@ interface StaffMonthlySummaryItem {
   total_amount: number | string;
 }
 
+interface ResolvedPaymentStaff {
+  staffId: number | null;
+  staffName: string;
+}
+
 interface CardTabProps {
   services: ServiceOrder[];
   customers: Customer[];
@@ -2216,8 +2221,54 @@ const CardTab: React.FC<CardTabProps> = ({
       const response = await fetch(`${WATER_SERVICES_URL}?action=staff_monthly_summary&month=${month}`);
       const result = await response.json();
       if (response.ok && result.success) {
-        setStaffMonthlySummary(result.summary || []);
-        setStaffMonthlyPayments(result.payments || []);
+        const payments: WaterServicePayment[] = Array.isArray(result.payments) ? result.payments : [];
+
+        const resolvePaymentStaff = (payment: WaterServicePayment): ResolvedPaymentStaff => {
+          if (payment.service_staff_id) {
+            return {
+              staffId: payment.service_staff_id,
+              staffName: payment.service_staff_name || `Staff #${payment.service_staff_id}`,
+            };
+          }
+
+          const linkedService = services.find((service) => service.id === Number(payment.service_id));
+          const fallbackName =
+            linkedService?.service_staff_name ||
+            linkedService?.staff_name ||
+            linkedService?.assigned_staff ||
+            linkedService?.technician ||
+            payment.service_staff_name ||
+            'Unassigned';
+
+          return {
+            staffId: linkedService?.service_staff_id || null,
+            staffName: fallbackName,
+          };
+        };
+
+        const summaryMap = new Map<string, { service_staff_id: number | null; service_staff_name: string; service_count: number; total_amount: number }>();
+
+        payments.forEach((payment) => {
+          const resolved = resolvePaymentStaff(payment);
+          const key = `${resolved.staffId ?? 'none'}::${resolved.staffName}`;
+          const existing = summaryMap.get(key) || {
+            service_staff_id: resolved.staffId,
+            service_staff_name: resolved.staffName,
+            service_count: 0,
+            total_amount: 0,
+          };
+
+          existing.service_count += 1;
+          existing.total_amount += Number(payment.amount || 0);
+          summaryMap.set(key, existing);
+        });
+
+        const normalizedSummary = Array.from(summaryMap.values()).sort((a, b) =>
+          a.service_staff_name.localeCompare(b.service_staff_name)
+        );
+
+        setStaffMonthlySummary(normalizedSummary);
+        setStaffMonthlyPayments(payments);
       } else {
         setStaffMonthlySummary([]);
         setStaffMonthlyPayments([]);
@@ -2228,7 +2279,7 @@ const CardTab: React.FC<CardTabProps> = ({
     } finally {
       setStaffSummaryLoading(false);
     }
-  }, []);
+  }, [services]);
 
   React.useEffect(() => {
     fetchStaffMonthlySummary(staffSummaryMonth);
@@ -2363,10 +2414,10 @@ const CardTab: React.FC<CardTabProps> = ({
   
   // Pagination calculations
   const totalItems = allFilteredServices.length;
-  const totalPages = Math.ceil(totalItems / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
-  const displayedServices = allFilteredServices.slice(startIndex, endIndex);
+  const totalPages = totalItems > 0 ? 1 : 0;
+  const startIndex = 0;
+  const endIndex = totalItems;
+  const displayedServices = allFilteredServices;
 
   // Update selectAll when selectedRows changes
   React.useEffect(() => {
@@ -4156,7 +4207,7 @@ const CardTab: React.FC<CardTabProps> = ({
             marginLeft: 'auto'
           }}>
             <span style={{ fontSize: '11px', color: '#6b7280' }}>
-              Page {currentPage} of {totalPages}
+              Showing all services
             </span>
           </div>
         </div>
@@ -4732,7 +4783,7 @@ const CardTab: React.FC<CardTabProps> = ({
               color: '#6b7280',
               textAlign: isMobile ? 'center' : 'left'
             }}>
-              Showing {startIndex + 1} to {endIndex} of {totalItems} entries
+              Showing all {totalItems} entries
             </div>
 
             <div style={{

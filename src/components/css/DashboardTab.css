@@ -150,6 +150,16 @@
   transition: all 0.2s ease;
 }
 
+.clickable-card {
+  cursor: pointer;
+}
+
+.clickable-card:focus-visible,
+.clickable-section:focus-visible {
+  outline: 3px solid rgba(59, 130, 246, 0.35);
+  outline-offset: 3px;
+}
+
 .stat-card.small {
   padding: 1rem;
 }
@@ -214,6 +224,24 @@
   justify-content: space-between;
   align-items: center;
   margin: 2rem 0 1rem;
+}
+
+.clickable-section {
+  cursor: pointer;
+  border-radius: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.clickable-section:hover {
+  background-color: #f8fafc;
+  transform: translateY(-1px);
+}
+
+.section-link-hint {
+  color: #2563eb;
+  font-size: 0.875rem;
+  font-weight: 600;
 }
 
 .section-title h2 {

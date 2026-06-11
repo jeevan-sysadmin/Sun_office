@@ -95,7 +95,6 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const [itemsPerPage] = useState<number>(20);
 
   // Handle resize
   useEffect(() => {
@@ -119,6 +118,21 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
     );
 
     return service.customer_alternate_phone || matchedCustomer?.alternate_phone || '';
+  };
+
+  const getCustomerName = (service: ServiceOrder): string => {
+    const matchedCustomer = customers.find((customer) =>
+      (service.customer_id && customer.id === service.customer_id) ||
+      (service.customer_name && customer.full_name === service.customer_name) ||
+      (service.customer_phone && customer.phone === service.customer_phone)
+    );
+
+    return service.customer_name || matchedCustomer?.full_name || `Customer #${service.customer_id || service.id}`;
+  };
+
+  const formatIdList = (ids?: number[]) => {
+    if (!Array.isArray(ids) || ids.length === 0) return '-';
+    return ids.join(', ');
   };
 
   // Update last refreshed when data changes
@@ -248,10 +262,10 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
   
   // Pagination logic
   const totalItems = allFilteredServices.length;
-  const totalPages = Math.ceil(totalItems / itemsPerPage);
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const displayServices = allFilteredServices.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = totalItems > 0 ? 1 : 0;
+  const indexOfLastItem = totalItems;
+  const indexOfFirstItem = 0;
+  const displayServices = allFilteredServices;
 
   // Pagination handlers
   const goToPage = (page: number) => {
@@ -1968,7 +1982,7 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
               fontSize: isMobile ? '12px' : '12px',
               color: '#6b7280'
             }}>
-              Showing <strong>{indexOfFirstItem + 1}-{Math.min(indexOfLastItem, totalItems)}</strong> of <strong>{totalItems}</strong> service calls
+              Showing <strong>all {totalItems}</strong> service calls
             </span>
             
             {searchTerm && (
@@ -2073,6 +2087,15 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
                       fontSize: isTablet ? '11px' : '12px',
                       textTransform: 'uppercase',
                       letterSpacing: '0.05em'
+                    }}>ID</th>
+                    <th style={{
+                      padding: isTablet ? '12px' : '14px',
+                      textAlign: 'left',
+                      fontWeight: '600',
+                      color: '#ffffff',
+                      fontSize: isTablet ? '11px' : '12px',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
                     }}>Service Code</th>
                     <th style={{
                       padding: isTablet ? '12px' : '14px',
@@ -2082,7 +2105,52 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
                       fontSize: isTablet ? '11px' : '12px',
                       textTransform: 'uppercase',
                       letterSpacing: '0.05em'
+                    }}>Customer ID</th>
+                    <th style={{
+                      padding: isTablet ? '12px' : '14px',
+                      textAlign: 'left',
+                      fontWeight: '600',
+                      color: '#ffffff',
+                      fontSize: isTablet ? '11px' : '12px',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
                     }}>Customer</th>
+                    <th style={{
+                      padding: isTablet ? '12px' : '14px',
+                      textAlign: 'left',
+                      fontWeight: '600',
+                      color: '#ffffff',
+                      fontSize: isTablet ? '11px' : '12px',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
+                    }}>Battery IDs</th>
+                    <th style={{
+                      padding: isTablet ? '12px' : '14px',
+                      textAlign: 'left',
+                      fontWeight: '600',
+                      color: '#ffffff',
+                      fontSize: isTablet ? '11px' : '12px',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
+                    }}>Inverter IDs</th>
+                    <th style={{
+                      padding: isTablet ? '12px' : '14px',
+                      textAlign: 'left',
+                      fontWeight: '600',
+                      color: '#ffffff',
+                      fontSize: isTablet ? '11px' : '12px',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
+                    }}>Primary Battery</th>
+                    <th style={{
+                      padding: isTablet ? '12px' : '14px',
+                      textAlign: 'left',
+                      fontWeight: '600',
+                      color: '#ffffff',
+                      fontSize: isTablet ? '11px' : '12px',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
+                    }}>Primary Inverter</th>
                     <th style={{
                       padding: isTablet ? '12px' : '14px',
                       textAlign: 'left',
@@ -2109,7 +2177,52 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
                       fontSize: isTablet ? '11px' : '12px',
                       textTransform: 'uppercase',
                       letterSpacing: '0.05em'
+                    }}>Warranty</th>
+                    <th style={{
+                      padding: isTablet ? '12px' : '14px',
+                      textAlign: 'left',
+                      fontWeight: '600',
+                      color: '#ffffff',
+                      fontSize: isTablet ? '11px' : '12px',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
+                    }}>AMC</th>
+                    <th style={{
+                      padding: isTablet ? '12px' : '14px',
+                      textAlign: 'left',
+                      fontWeight: '600',
+                      color: '#ffffff',
+                      fontSize: isTablet ? '11px' : '12px',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
+                    }}>Staff ID</th>
+                    <th style={{
+                      padding: isTablet ? '12px' : '14px',
+                      textAlign: 'left',
+                      fontWeight: '600',
+                      color: '#ffffff',
+                      fontSize: isTablet ? '11px' : '12px',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
                     }}>Created Date</th>
+                    <th style={{
+                      padding: isTablet ? '12px' : '14px',
+                      textAlign: 'left',
+                      fontWeight: '600',
+                      color: '#ffffff',
+                      fontSize: isTablet ? '11px' : '12px',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
+                    }}>Updated Date</th>
+                    <th style={{
+                      padding: isTablet ? '12px' : '14px',
+                      textAlign: 'left',
+                      fontWeight: '600',
+                      color: '#ffffff',
+                      fontSize: isTablet ? '11px' : '12px',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
+                    }}>Notes</th>
                     <th style={{
                       padding: isTablet ? '12px' : '14px',
                       textAlign: 'center',
@@ -2157,7 +2270,17 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
                         </MotionDiv>
                       </td>
                       <td style={{ padding: isTablet ? '12px' : '14px' }}>
+                        <div style={{ fontWeight: '600', color: '#111827', fontSize: isTablet ? '13px' : '14px' }}>
+                          {service.id}
+                        </div>
+                      </td>
+                      <td style={{ padding: isTablet ? '12px' : '14px' }}>
                         <div style={{ fontWeight: '600', color: '#111827', fontSize: isTablet ? '13px' : '14px' }}>{service.service_code}</div>
+                      </td>
+                      <td style={{ padding: isTablet ? '12px' : '14px' }}>
+                        <div style={{ fontSize: isTablet ? '12px' : '13px', color: '#4b5563', fontFamily: 'monospace' }}>
+                          {service.customer_id || '-'}
+                        </div>
                       </td>
                       <td style={{ padding: isTablet ? '12px' : '14px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -2177,7 +2300,7 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
                             {service.customer_name?.charAt(0) || 'C'}
                           </div>
                           <div>
-                            <div style={{ fontWeight: '500', color: '#111827', marginBottom: '2px', fontSize: isTablet ? '13px' : '14px' }}>{service.customer_name}</div>
+                            <div style={{ fontWeight: '500', color: '#111827', marginBottom: '2px', fontSize: isTablet ? '13px' : '14px' }}>{getCustomerName(service)}</div>
                             <div style={{ fontSize: isTablet ? '11px' : '12px', color: '#6b7280', display: 'flex', alignItems: 'center', gap: '4px' }}>
                               <FiPhone size={isTablet ? 9 : 10} /> {service.customer_phone}
                             </div>
@@ -2187,6 +2310,26 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
                               </div>
                             )}
                           </div>
+                        </div>
+                      </td>
+                      <td style={{ padding: isTablet ? '12px' : '14px' }}>
+                        <div style={{ fontSize: isTablet ? '12px' : '13px', color: '#4b5563', fontFamily: 'monospace' }}>
+                          {formatIdList(service.battery_ids)}
+                        </div>
+                      </td>
+                      <td style={{ padding: isTablet ? '12px' : '14px' }}>
+                        <div style={{ fontSize: isTablet ? '12px' : '13px', color: '#4b5563', fontFamily: 'monospace' }}>
+                          {formatIdList(service.inverter_ids)}
+                        </div>
+                      </td>
+                      <td style={{ padding: isTablet ? '12px' : '14px' }}>
+                        <div style={{ fontSize: isTablet ? '12px' : '13px', color: '#4b5563', fontFamily: 'monospace' }}>
+                          {service.battery_id || '-'}
+                        </div>
+                      </td>
+                      <td style={{ padding: isTablet ? '12px' : '14px' }}>
+                        <div style={{ fontSize: isTablet ? '12px' : '13px', color: '#4b5563', fontFamily: 'monospace' }}>
+                          {service.inverter_id || '-'}
                         </div>
                       </td>
                       <td style={{ padding: isTablet ? '12px' : '14px' }}>
@@ -2226,11 +2369,41 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
                         </div>
                       </td>
                       <td style={{ padding: isTablet ? '12px' : '14px' }}>
+                        <div style={{ fontSize: isTablet ? '12px' : '13px', color: '#4b5563' }}>
+                          {formatReceiptLabel(service.warranty_status) || '-'}
+                        </div>
+                      </td>
+                      <td style={{ padding: isTablet ? '12px' : '14px' }}>
+                        <div style={{ fontSize: isTablet ? '12px' : '13px', color: '#4b5563' }}>
+                          {formatReceiptLabel(service.amc_status) || '-'}
+                        </div>
+                      </td>
+                      <td style={{ padding: isTablet ? '12px' : '14px' }}>
+                        <div style={{ fontSize: isTablet ? '12px' : '13px', color: '#4b5563', fontFamily: 'monospace' }}>
+                          {service.service_staff_id || '-'}
+                        </div>
+                      </td>
+                      <td style={{ padding: isTablet ? '12px' : '14px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <FiCalendar style={{ color: '#6b7280', fontSize: isTablet ? '11px' : '12px' }} />
                           <span style={{ fontSize: isTablet ? '12px' : '13px', color: '#4b5563' }}>
                             {formatDate(service.created_at)}
                           </span>
+                        </div>
+                      </td>
+                      <td style={{ padding: isTablet ? '12px' : '14px' }}>
+                        <div style={{ fontSize: isTablet ? '12px' : '13px', color: '#4b5563' }}>
+                          {formatDate(service.updated_at)}
+                        </div>
+                      </td>
+                      <td style={{ padding: isTablet ? '12px' : '14px', maxWidth: isTablet ? '160px' : '220px' }}>
+                        <div style={{
+                          fontSize: isTablet ? '12px' : '13px',
+                          color: '#4b5563',
+                          whiteSpace: 'pre-wrap',
+                          wordBreak: 'break-word'
+                        }}>
+                          {service.notes || '-'}
                         </div>
                       </td>
                       <td style={{ padding: isTablet ? '12px' : '14px' }}>
@@ -2425,7 +2598,7 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
             fontSize: isMobile ? '13px' : '14px',
             order: isMobile ? 2 : 1
           }}>
-            Showing <strong>{indexOfFirstItem + 1}-{Math.min(indexOfLastItem, totalItems)}</strong> of <strong>{totalItems}</strong> results
+            Showing <strong>all {totalItems}</strong> results
           </div>
           
           <div style={{

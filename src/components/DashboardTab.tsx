@@ -57,6 +57,12 @@ interface DashboardTabProps {
   dashboardStats: DashboardStats;
   selectedFinancialMonth?: string;
   onFinancialMonthChange?: (month: string) => void;
+  onOpenDashboardOverview?: () => void;
+  onOpenFinancialOverview?: () => void;
+  onOpenCustomersPage?: () => void;
+  onOpenServicesPage?: () => void;
+  onOpenProductsPage?: () => void;
+  onOpenStaffPage?: () => void;
   recentServices?: any[];
   activities?: any[];
   getStatusColor?: (status: string) => string;
@@ -73,8 +79,26 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
   dashboardStats,
   selectedFinancialMonth = '',
   onFinancialMonthChange,
+  onOpenDashboardOverview,
+  onOpenFinancialOverview,
+  onOpenCustomersPage,
+  onOpenServicesPage,
+  onOpenProductsPage,
+  onOpenStaffPage,
   loading
 }) => {
+  const handleCardKeyDown = (
+    event: React.KeyboardEvent<HTMLDivElement>,
+    onOpen?: () => void
+  ) => {
+    if (!onOpen) return;
+
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      onOpen();
+    }
+  };
+
   // State for current date and time
   const [currentDateTime, setCurrentDateTime] = useState({
     date: "",
@@ -137,28 +161,32 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
       title: "Total Customers",
       value: dashboardStats.total_customers?.toString() || "0",
       icon: <FiUsers />,
-      color: "#3B82F6"
+      color: "#3B82F6",
+      onClick: onOpenCustomersPage
     },
     {
       id: 2,
       title: "Total Services",
       value: dashboardStats.total_services?.toString() || "0",
       icon: <FiShoppingBag />,
-      color: "#10B981"
+      color: "#10B981",
+      onClick: onOpenServicesPage
     },
     {
       id: 3,
       title: "Total Batteries",
       value: dashboardStats.total_batteries?.toString() || "0",
       icon: <FiBattery />,
-      color: "#F59E0B"
+      color: "#F59E0B",
+      onClick: onOpenProductsPage
     },
     {
       id: 4,
       title: "Total Staff",
       value: dashboardStats.total_staff?.toString() || "0",
       icon: <FiUsers />,
-      color: "#8B5CF6"
+      color: "#8B5CF6",
+      onClick: onOpenStaffPage
     }
   ];
 
@@ -169,28 +197,32 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
       title: "Monthly Revenue",
       value: `₹${(dashboardStats.monthly_revenue || 0).toLocaleString()}`,
       icon: <FiDollarSign />,
-      color: "#10B981"
+      color: "#10B981",
+      onClick: onOpenFinancialOverview
     },
     {
       id: 2,
       title: "Monthly Expenses",
       value: `₹${(dashboardStats.monthly_expenses || 0).toLocaleString()}`,
       icon: <FiCreditCard />,
-      color: "#F59E0B"
+      color: "#F59E0B",
+      onClick: onOpenFinancialOverview
     },
     {
       id: 3,
       title: "Monthly Salary",
       value: `₹${(dashboardStats.monthly_salary || 0).toLocaleString()}`,
       icon: <FiUsers />,
-      color: "#3B82F6"
+      color: "#3B82F6",
+      onClick: onOpenFinancialOverview
     },
     {
       id: 4,
       title: "Monthly Profit",
       value: `₹${(dashboardStats.monthly_profit || 0).toLocaleString()}`,
       icon: <FiTrendingUp />,
-      color: (dashboardStats.monthly_profit || 0) >= 0 ? "#10B981" : "#DC2626"
+      color: (dashboardStats.monthly_profit || 0) >= 0 ? "#10B981" : "#DC2626",
+      onClick: onOpenFinancialOverview
     }
   ];
 
@@ -319,22 +351,33 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
       </motion.div>
 
       {/* Main Stats Grid - Only Essential Stats */}
-      <div className="section-header">
+      <div
+        className={`section-header ${onOpenDashboardOverview ? "clickable-section" : ""}`}
+        onClick={onOpenDashboardOverview}
+        onKeyDown={(event) => handleCardKeyDown(event, onOpenDashboardOverview)}
+        role={onOpenDashboardOverview ? "button" : undefined}
+        tabIndex={onOpenDashboardOverview ? 0 : undefined}
+      >
         <div className="section-title">
           <h2>Dashboard Overview</h2>
           <p>Key business metrics</p>
         </div>
+        {onOpenDashboardOverview && <span className="section-link-hint">Open page</span>}
       </div>
       
       <div className="stats-grid">
         {mainStatsData.map((stat, index) => (
           <motion.div
             key={stat.id}
-            className="stat-card"
+            className={`stat-card ${stat.onClick ? "clickable-card" : ""}`}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
             whileHover={{ y: -5, boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1)" }}
+            onClick={stat.onClick}
+            onKeyDown={(event) => handleCardKeyDown(event, stat.onClick)}
+            role={stat.onClick ? "button" : undefined}
+            tabIndex={stat.onClick ? 0 : undefined}
           >
             <div 
               className="stat-icon-container"
@@ -351,7 +394,13 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
       </div>
 
       {/* Financial Stats Grid */}
-      <div className="section-header">
+      <div
+        className={`section-header ${onOpenFinancialOverview ? "clickable-section" : ""}`}
+        onClick={onOpenFinancialOverview}
+        onKeyDown={(event) => handleCardKeyDown(event, onOpenFinancialOverview)}
+        role={onOpenFinancialOverview ? "button" : undefined}
+        tabIndex={onOpenFinancialOverview ? 0 : undefined}
+      >
         <div className="section-title">
           <h2>Financial Overview</h2>
           <p>Monthly financial statistics</p>
@@ -368,6 +417,8 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
               fontSize: '14px',
               backgroundColor: '#fff'
             }}
+            onClick={(event) => event.stopPropagation()}
+            onKeyDown={(event) => event.stopPropagation()}
           />
         </div>
       </div>
@@ -376,11 +427,15 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
         {financialStatsData.map((stat, index) => (
           <motion.div
             key={stat.id}
-            className="stat-card"
+            className={`stat-card ${stat.onClick ? "clickable-card" : ""}`}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
             whileHover={{ y: -5 }}
+            onClick={stat.onClick}
+            onKeyDown={(event) => handleCardKeyDown(event, stat.onClick)}
+            role={stat.onClick ? "button" : undefined}
+            tabIndex={stat.onClick ? 0 : undefined}
           >
             <div 
               className="stat-icon-container"
