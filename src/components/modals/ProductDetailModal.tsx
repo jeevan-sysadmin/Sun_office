@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { 
   FiX,
   FiEdit,
+  FiTrash2,
   FiBattery,
   FiPackage,
   FiDollarSign,
@@ -74,6 +75,7 @@ interface ProductDetailModalProps {
   productType: 'battery' | 'inverter';
   onClose: () => void;
   onEdit: () => void;
+  onDelete: () => void;
   getBatteryTypeColor?: (type: string) => string;
   getConditionColor?: (condition: string) => string;
 }
@@ -93,6 +95,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   productType,
   onClose,
   onEdit,
+  onDelete,
   getBatteryTypeColor = (_type: string) => '#6b7280',
   getConditionColor = (_condition: string) => '#6b7280'
 }) => {
@@ -1582,6 +1585,40 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 borderTop: '2px solid #e5e7eb'
               }}
             >
+              <motion.button 
+                className="btn danger"
+                onClick={() => {
+                  onClose();
+                  onDelete();
+                }}
+                whileHover={{ scale: 1.02, backgroundColor: '#fef2f2' }}
+                whileTap={{ scale: 0.98 }}
+                style={{
+                  padding: isTablet ? '12px 28px' : '12px 32px',
+                  background: isBattery(product)
+                    ? 'linear-gradient(135deg, #1d4ed8 0%, #0f4c81 100%)'
+                    : 'linear-gradient(135deg, #ea580c 0%, #9a3412 100%)',
+                  border: isBattery(product)
+                    ? '2px solid #1d4ed8'
+                    : '2px solid #c2410c',
+                  borderRadius: '10px',
+                  color: '#ffffff',
+                  cursor: 'pointer',
+                  fontSize: getFontSize('body'),
+                  fontWeight: '600',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  transition: 'all 0.2s',
+                  boxShadow: isBattery(product)
+                    ? '0 4px 10px rgba(29, 78, 216, 0.28)'
+                    : '0 4px 10px rgba(234, 88, 12, 0.28)'
+                }}
+              >
+                <FiTrash2 size={isTablet ? 18 : 16} /> Delete {isBattery(product) ? 'Battery' : 'Inverter'}
+              </motion.button>
+
               <motion.button 
                 className="btn outline"
                 onClick={onClose}

@@ -17,6 +17,7 @@ import {
   FiTag,
   FiClock,
   FiAlertCircle,
+  FiTrash2,
 } from "react-icons/fi";
 import type { ServiceOrder } from "../types";
 import {
@@ -30,6 +31,7 @@ interface ServiceDetailModalProps {
   service: ServiceOrder;
   onClose: () => void;
   onEdit: () => void;
+  onDelete: () => void;
   getStatusColor: (status: string) => string;
   getPriorityColor: (priority: string) => string;
   getPaymentStatusColor: (status: string) => string;
@@ -41,6 +43,7 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
   service,
   onClose,
   onEdit,
+  onDelete,
   getWarrantyColor = () => "#6B7280",
 }) => {
   // Window width state for responsive design
@@ -1933,6 +1936,33 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
               Close
             </motion.button>
             
+            <motion.button 
+              className="btn danger"
+              onClick={onDelete}
+              whileHover={{ scale: 1.02, boxShadow: '0 10px 15px -3px rgba(220, 38, 38, 0.25)' }}
+              whileTap={{ scale: 0.98 }}
+              style={{
+                padding: isMobile ? '16px 24px' : '14px 32px',
+                borderRadius: '14px',
+                border: '1px solid #fecaca',
+                background: 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)',
+                color: '#dc2626',
+                cursor: 'pointer',
+                fontSize: isMobile ? '16px' : '15px',
+                fontWeight: '600',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '10px',
+                width: isMobile ? '100%' : 'auto',
+                boxShadow: '0 4px 6px -1px rgba(220, 38, 38, 0.12)',
+                transition: 'all 0.2s'
+              }}
+            >
+              <FiTrash2 size={18} />
+              Delete Service
+            </motion.button>
+
             <motion.button 
               className="btn primary"
               onClick={onEdit}

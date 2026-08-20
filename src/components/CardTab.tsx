@@ -91,6 +91,11 @@ interface CardTabProps {
   error?: string | null;
   onRefresh: () => void;
   onViewService: (service: ServiceOrder) => void;
+  drilldownFilter?: {
+    staffName: string;
+    serviceDate: string;
+    requestKey: number;
+  } | null;
   filterStatus?: string;
   filterPriority?: string;
   filterClaimType?: string;
@@ -335,7 +340,10 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (service && amount && serviceDate) {
+    const parsedAmount = parseFloat(amount);
+    const hasValidAmount = amount !== "" && !Number.isNaN(parsedAmount) && parsedAmount >= 0;
+
+    if (service && hasValidAmount && serviceDate) {
       setIsSubmitting(true);
       setError("");
       try {
@@ -353,7 +361,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
           service_id: service.id,
           customer_id: service.customer_id,
           battery_id: batteryId ? parseInt(batteryId, 10) : null,
-          amount: parseFloat(amount),
+          amount: parsedAmount,
           service_date: serviceDate,
           notes: notes || `Water service payment for service #${service.service_code}`,
           created_by: 1,
@@ -378,8 +386,8 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   };
 
   const formatCurrency = (amount: string | number) => {
-    if (!amount) return '';
     const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
+    if (Number.isNaN(numAmount)) return '';
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
       currency: 'INR',
@@ -389,6 +397,10 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   };
 
   if (!isOpen || !service) return null;
+
+  const parsedAmount = parseFloat(amount);
+  const hasValidAmount = amount !== "" && !Number.isNaN(parsedAmount) && parsedAmount >= 0;
+  const isSubmitDisabled = !hasValidAmount || !serviceDate || !batteryId || !serviceStaffId || isSubmitting;
 
   return (
     <AnimatePresence>
@@ -682,12 +694,12 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                       fontSize: '16px',
                       outline: 'none',
                       transition: 'all 0.2s',
-                      borderColor: amount ? '#10b981' : '#d1d5db',
-                      boxShadow: amount ? '0 0 0 3px rgba(16, 185, 129, 0.1)' : 'none'
+                      borderColor: hasValidAmount ? '#10b981' : '#d1d5db',
+                      boxShadow: hasValidAmount ? '0 0 0 3px rgba(16, 185, 129, 0.1)' : 'none'
                     }}
                   />
                 </div>
-                {amount && (
+                {hasValidAmount && (
                   <p style={{
                     margin: '4px 0 0',
                     fontSize: '12px',
@@ -805,20 +817,20 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                 type="submit"
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                disabled={!amount || !serviceDate || !batteryId || !serviceStaffId || isSubmitting}
+                disabled={isSubmitDisabled}
                 style={{
                   padding: '12px 24px',
                   borderRadius: '10px',
                   border: 'none',
-                  background: !amount || !serviceDate || !batteryId || !serviceStaffId ? '#9ca3af' : (mode === 'edit' ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)'),
+                  background: isSubmitDisabled ? '#9ca3af' : (mode === 'edit' ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)'),
                   color: '#fff',
                   fontSize: '14px',
                   fontWeight: '500',
-                  cursor: !amount || !serviceDate || !batteryId || !serviceStaffId || isSubmitting ? 'not-allowed' : 'pointer',
+                  cursor: isSubmitDisabled ? 'not-allowed' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
-                  opacity: !amount || !serviceDate || !batteryId || !serviceStaffId || isSubmitting ? 0.6 : 1
+                  opacity: isSubmitDisabled ? 0.6 : 1
                 }}
               >
                 <FiSave size={16} />
@@ -2111,6 +2123,7 @@ const CardTab: React.FC<CardTabProps> = ({
   loading,
   error,
   onRefresh,
+  drilldownFilter = null,
   filterStatus = "all",
   filterPriority = "all",
   filterClaimType = "all",
@@ -2170,6 +2183,7 @@ const CardTab: React.FC<CardTabProps> = ({
   const [staffMonthlySummary, setStaffMonthlySummary] = React.useState<StaffMonthlySummaryItem[]>([]);
   const [, setStaffMonthlyPayments] = React.useState<WaterServicePayment[]>([]);
   const [staffSummaryLoading, setStaffSummaryLoading] = React.useState<boolean>(false);
+  const [allPaymentRecords, setAllPaymentRecords] = React.useState<WaterServicePayment[]>([]);
   
   // Toast notification state
   const [toast, setToast] = React.useState<{
@@ -2285,10 +2299,55 @@ const CardTab: React.FC<CardTabProps> = ({
     fetchStaffMonthlySummary(staffSummaryMonth);
   }, [staffSummaryMonth, fetchStaffMonthlySummary]);
 
+  React.useEffect(() => {
+    const fetchAllPaymentRecords = async () => {
+      try {
+        const response = await fetch(WATER_SERVICES_URL);
+        const result = await response.json();
+        if (response.ok) {
+          setAllPaymentRecords(Array.isArray(result.records) ? result.records : []);
+        } else {
+          setAllPaymentRecords([]);
+        }
+      } catch (_err) {
+        setAllPaymentRecords([]);
+      }
+    };
+
+    fetchAllPaymentRecords();
+  }, []);
+
+  React.useEffect(() => {
+    if (!drilldownFilter) return;
+
+    setSearchQuery("");
+    setDateFilterType("all");
+    setFromDate(drilldownFilter.serviceDate || "");
+    setToDate(drilldownFilter.serviceDate || "");
+    setShowFilters(true);
+    setCurrentPage(1);
+  }, [drilldownFilter?.requestKey]);
+
   // Reset to page 1 when filters change
   React.useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, filterStatus, filterPriority, filterWarrantyStatus, filterAmcStatus, filterClaimType, dateFilterType, fromDate, toDate]);
+
+  const resolvePaymentStaffName = React.useCallback((payment: WaterServicePayment) => {
+    if (payment.service_staff_name && payment.service_staff_name.trim()) {
+      return payment.service_staff_name.trim();
+    }
+
+    const linkedService = services.find((service) => service.id === Number(payment.service_id));
+    return (
+      linkedService?.service_staff_name ||
+      linkedService?.staff_name ||
+      linkedService?.assigned_staff ||
+      linkedService?.technician ||
+      linkedService?.staff?.name ||
+      'Unassigned'
+    ).trim();
+  }, [services]);
 
   // Filter out inverter services and then apply other filters
   const getFilteredAndSortedServices = React.useCallback(() => {
@@ -2301,60 +2360,62 @@ const CardTab: React.FC<CardTabProps> = ({
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // Apply date filters based on created_at (service date)
-    switch (dateFilterType) {
-      case "today":
-        filtered = filtered.filter(service => {
-          const serviceDate = new Date(service.created_at);
-          serviceDate.setHours(0, 0, 0, 0);
-          return serviceDate.getTime() === today.getTime();
-        });
-        break;
-      
-      case "this_week":
-        const weekStart = new Date(today);
-        weekStart.setDate(today.getDate() - today.getDay());
-        weekStart.setHours(0, 0, 0, 0);
-        filtered = filtered.filter(service => {
-          const serviceDate = new Date(service.created_at);
-          return serviceDate >= weekStart;
-        });
-        break;
-      
-      case "this_month":
-        const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-        monthStart.setHours(0, 0, 0, 0);
-        filtered = filtered.filter(service => {
-          const serviceDate = new Date(service.created_at);
-          return serviceDate >= monthStart;
-        });
-        break;
-      
-      case "this_year":
-        const yearStart = new Date(today.getFullYear(), 0, 1);
-        yearStart.setHours(0, 0, 0, 0);
-        filtered = filtered.filter(service => {
-          const serviceDate = new Date(service.created_at);
-          return serviceDate >= yearStart;
-        });
-        break;
-      
-      case "custom":
-        if (fromDate && toDate) {
-          const from = new Date(fromDate);
-          from.setHours(0, 0, 0, 0);
-          const to = new Date(toDate);
-          to.setHours(23, 59, 59, 999);
-          
+    if (!drilldownFilter) {
+      // Apply normal date filters based on service created_at only for manual page filtering.
+      switch (dateFilterType) {
+        case "today":
           filtered = filtered.filter(service => {
             const serviceDate = new Date(service.created_at);
-            return serviceDate >= from && serviceDate <= to;
+            serviceDate.setHours(0, 0, 0, 0);
+            return serviceDate.getTime() === today.getTime();
           });
-        }
-        break;
-      
-      default:
-        break;
+          break;
+        
+        case "this_week":
+          const weekStart = new Date(today);
+          weekStart.setDate(today.getDate() - today.getDay());
+          weekStart.setHours(0, 0, 0, 0);
+          filtered = filtered.filter(service => {
+            const serviceDate = new Date(service.created_at);
+            return serviceDate >= weekStart;
+          });
+          break;
+        
+        case "this_month":
+          const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+          monthStart.setHours(0, 0, 0, 0);
+          filtered = filtered.filter(service => {
+            const serviceDate = new Date(service.created_at);
+            return serviceDate >= monthStart;
+          });
+          break;
+        
+        case "this_year":
+          const yearStart = new Date(today.getFullYear(), 0, 1);
+          yearStart.setHours(0, 0, 0, 0);
+          filtered = filtered.filter(service => {
+            const serviceDate = new Date(service.created_at);
+            return serviceDate >= yearStart;
+          });
+          break;
+        
+        case "custom":
+          if (fromDate && toDate) {
+            const from = new Date(fromDate);
+            from.setHours(0, 0, 0, 0);
+            const to = new Date(toDate);
+            to.setHours(23, 59, 59, 999);
+            
+            filtered = filtered.filter(service => {
+              const serviceDate = new Date(service.created_at);
+              return serviceDate >= from && serviceDate <= to;
+            });
+          }
+          break;
+        
+        default:
+          break;
+      }
     }
 
     if (filterStatus !== "all") {
@@ -2380,6 +2441,14 @@ const CardTab: React.FC<CardTabProps> = ({
     if (searchQuery.trim() !== "") {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(service => 
+        (
+          service.service_staff_name ||
+          service.staff_name ||
+          service.assigned_staff ||
+          service.technician ||
+          (service.staff && service.staff.name) ||
+          'Unassigned'
+        ).toLowerCase().includes(query) ||
         service.service_code?.toLowerCase().includes(query) ||
         service.customer_name?.toLowerCase().includes(query) ||
         service.customer_phone?.includes(query) ||
@@ -2388,6 +2457,31 @@ const CardTab: React.FC<CardTabProps> = ({
         service.battery_serial?.toLowerCase().includes(query) ||
         service.customer_email?.toLowerCase().includes(query)
       );
+    }
+
+    if (drilldownFilter?.serviceDate) {
+      const normalizedStaffName = (drilldownFilter.staffName || '').trim().toLowerCase();
+      const useStaffFilter = normalizedStaffName !== '' && normalizedStaffName !== 'unassigned';
+
+      const matchedServiceIds = new Set(
+        allPaymentRecords
+          .filter((payment) => {
+            const paymentDate = String(payment.service_date || '').slice(0, 10);
+            if (paymentDate !== drilldownFilter.serviceDate) {
+              return false;
+            }
+
+            if (!useStaffFilter) {
+              return true;
+            }
+
+            return resolvePaymentStaffName(payment).toLowerCase() === normalizedStaffName;
+          })
+          .map((payment) => Number(payment.service_id))
+          .filter((serviceId) => Number.isFinite(serviceId) && serviceId > 0)
+      );
+
+      filtered = filtered.filter((service) => matchedServiceIds.has(service.id));
     }
 
     filtered.sort((a, b) => {
@@ -2408,7 +2502,7 @@ const CardTab: React.FC<CardTabProps> = ({
     });
 
     return filtered;
-  }, [services, filterStatus, filterPriority, filterWarrantyStatus, filterAmcStatus, filterClaimType, searchQuery, sortBy, dateFilterType, fromDate, toDate]);
+  }, [services, filterStatus, filterPriority, filterWarrantyStatus, filterAmcStatus, filterClaimType, searchQuery, sortBy, dateFilterType, fromDate, toDate, drilldownFilter, allPaymentRecords, resolvePaymentStaffName]);
 
   const allFilteredServices = getFilteredAndSortedServices();
   

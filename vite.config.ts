@@ -4,7 +4,12 @@ import path from 'path'
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
-  const apiBaseUrl = env.VITE_API_BASE_URL || "http://cloud.anyrdp.in:3000/sun_office/api";
+
+  const rawBasePath = env.VITE_APP_BASE_PATH || "/sunoffice/";
+  const appBasePath = rawBasePath === "/"
+    ? "/"
+    : `/${rawBasePath.replace(/^\/+|\/+$/g, "")}/`;
+  const proxyTarget = env.VITE_DEV_PROXY_TARGET || "http://localhost/sun_office/";
 
   return {
     plugins: [
@@ -16,8 +21,8 @@ export default defineConfig(({ mode }) => {
       })
     ],
 
-    // Base path for relative imports
-    base: "./",
+    // Base path for the deployed app
+    base: appBasePath,
     
     // Server configuration
     server: {
@@ -28,9 +33,10 @@ export default defineConfig(({ mode }) => {
       // Proxy for API requests
       proxy: {
         '/api': {
-          target: apiBaseUrl,
+
+          target: proxyTarget,
           changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/api/, '')
+          rewrite: (requestPath) => requestPath.replace(/^\/api/, '/api')
         }
       }
     },

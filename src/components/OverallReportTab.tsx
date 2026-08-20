@@ -2,13 +2,14 @@ import React, { useEffect, useMemo, useState } from "react";
 import { FiDownload, FiPrinter, FiRefreshCw } from "react-icons/fi";
 import type { DashboardStats, ServiceOrder } from "./types";
 import "./css/OverallReportTab.css";
-import { WATER_SERVICES_URL } from "../config/api";
+import { API_BASE_URL, WATER_SERVICES_URL } from "../config/api";
 
 interface OverallReportTabProps {
   services: ServiceOrder[];
   dashboardStats: DashboardStats;
   selectedMonth: string;
   onMonthChange: (month: string) => void;
+  onOpenCompletedCalls?: (filters: { staffName: string; serviceDate: string }) => void;
   loading?: boolean;
 }
 
@@ -22,6 +23,17 @@ interface StaffPaymentApiItem {
   service_staff_name?: string;
   service_date?: string;
   amount?: number | string;
+}
+
+interface SalaryApiItem {
+  id?: number | string;
+  staff_name?: string;
+  staff_user_name?: string;
+  amount?: number | string;
+  net_amount?: number | string;
+  salary_month?: string;
+  funding_source?: string;
+  funding_amount?: number | string;
 }
 
 const toAmount = (value: unknown): number => {
@@ -44,15 +56,24 @@ const getServiceAmount = (s: ServiceOrder): number => {
 const fmt = (n: number) =>
   new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 }).format(n);
 
+const formatServiceDate = (value: string): string => {
+  const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return value;
+  const [, year, month, day] = match;
+  return `${day}-${month}-${year}`;
+};
+
 const OverallReportTab: React.FC<OverallReportTabProps> = ({
   services,
   dashboardStats,
   selectedMonth,
   onMonthChange,
+  onOpenCompletedCalls,
   loading = false,
 }) => {
   const [staffMonthlySummary, setStaffMonthlySummary] = useState<StaffSummaryApiItem[]>([]);
   const [staffMonthlyPayments, setStaffMonthlyPayments] = useState<StaffPaymentApiItem[]>([]);
+  const [salaryRows, setSalaryRows] = useState<SalaryApiItem[]>([]);
 
   useEffect(() => {
     const fetchStaffMonthlySummary = async () => {
@@ -75,6 +96,24 @@ const OverallReportTab: React.FC<OverallReportTabProps> = ({
     };
 
     fetchStaffMonthlySummary();
+  }, [selectedMonth]);
+
+  useEffect(() => {
+    const fetchSalaryRows = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/salary.php?month=${selectedMonth}`);
+        const result = await response.json();
+        if (response.ok && result.success && Array.isArray(result.data)) {
+          setSalaryRows(result.data);
+        } else {
+          setSalaryRows([]);
+        }
+      } catch (_err) {
+        setSalaryRows([]);
+      }
+    };
+
+    fetchSalaryRows();
   }, [selectedMonth]);
 
   const report = useMemo(() => {
@@ -164,8 +203,34 @@ const OverallReportTab: React.FC<OverallReportTabProps> = ({
     const totalCalls = staffSummary.reduce((sum, row) => sum + row.numCalls, 0);
     const totalAmount = staffSummary.reduce((sum, row) => sum + row.totalAmount, 0);
 
-    return { monthServices, staffSummary, staffDaily, totalCalls, totalAmount };
-  }, [services, selectedMonth, staffMonthlySummary, staffMonthlyPayments]);
+    const salarySummary = salaryRows
+      .filter((row) => row.salary_month === selectedMonth)
+      .map((row) => {
+        const totalSalary = toAmount(row.net_amount || row.amount);
+        const rajElectricalsAmount = row.funding_source === "raj_communication" ? toAmount(row.funding_amount) : 0;
+        return {
+          staffName: (row.staff_user_name || row.staff_name || "Unknown").trim() || "Unknown",
+          totalSalary,
+          rajElectricalsAmount,
+          sunOfficeAmount: totalSalary - rajElectricalsAmount,
+        };
+      })
+      .sort((a, b) => b.totalSalary - a.totalSalary);
+
+    const totalSalaryAmount = salarySummary.reduce((sum, row) => sum + row.totalSalary, 0);
+    const totalRajElectricalsAmount = salarySummary.reduce((sum, row) => sum + row.rajElectricalsAmount, 0);
+
+    return {
+      monthServices,
+      staffSummary,
+      staffDaily,
+      totalCalls,
+      totalAmount,
+      salarySummary,
+      totalSalaryAmount,
+      totalRajElectricalsAmount,
+    };
+  }, [services, selectedMonth, staffMonthlySummary, staffMonthlyPayments, salaryRows]);
 
   const monthLabel = useMemo(() => {
     const [y, m] = selectedMonth.split("-").map((x) => parseInt(x, 10));
@@ -180,7 +245,7 @@ const OverallReportTab: React.FC<OverallReportTabProps> = ({
     const rows = [
       "Staff Name,Service Date,No Of Calls,Total Service Call Amount",
       ...report.staffDaily.map(
-        (r) => `${r.staffName},${r.serviceDate},${r.numCalls},${r.totalAmount.toFixed(2)}`
+        (r) => `${r.staffName},${formatServiceDate(r.serviceDate)},${r.numCalls},${r.totalAmount.toFixed(2)}`
       ),
     ];
     const blob = new Blob([rows.join("\n")], { type: "text/csv;charset=utf-8;" });
@@ -240,17 +305,51 @@ const OverallReportTab: React.FC<OverallReportTabProps> = ({
             </div>
             <div className="ledger-row">
               <span>Staff Salary</span>
-              <strong>{fmt(dashboardStats.monthly_salary)}</strong>
+              <strong>{fmt(report.totalSalaryAmount || dashboardStats.monthly_salary)}</strong>
             </div>
             <div className="ledger-row">
               <span>Other Expenses</span>
               <strong>{fmt(dashboardStats.monthly_expenses)}</strong>
             </div>
+            <div className="ledger-row highlight">
+              <span>Raj Electricals Salary</span>
+              <strong>{fmt(report.totalRajElectricalsAmount)}</strong>
+            </div>
             <div className="ledger-row total">
               <span>Total Payment</span>
-              <strong>{fmt(dashboardStats.monthly_salary + dashboardStats.monthly_expenses)}</strong>
+              <strong>{fmt((report.totalSalaryAmount || dashboardStats.monthly_salary) + dashboardStats.monthly_expenses)}</strong>
             </div>
           </div>
+        </div>
+
+        <div className="report-table-wrap">
+          <h4>Staff Salary</h4>
+          <table className="report-table">
+            <thead>
+              <tr>
+                <th>Staff Name</th>
+                <th>Salary Amount</th>
+                <th>Sun Office Amount</th>
+                <th>Raj Electricals Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {report.salarySummary.map((row, idx) => (
+                <tr key={`${row.staffName}-${idx}`}>
+                  <td>{row.staffName}</td>
+                  <td>{fmt(row.totalSalary)}</td>
+                  <td>{fmt(row.sunOfficeAmount)}</td>
+                  <td>{fmt(row.rajElectricalsAmount)}</td>
+                </tr>
+              ))}
+              <tr className="total-row">
+                <td>TOTAL</td>
+                <td>{fmt(report.totalSalaryAmount)}</td>
+                <td>{fmt(report.totalSalaryAmount - report.totalRajElectricalsAmount)}</td>
+                <td>{fmt(report.totalRajElectricalsAmount)}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
 
         <div className="kpi-strip">
@@ -299,9 +398,14 @@ const OverallReportTab: React.FC<OverallReportTabProps> = ({
             </thead>
             <tbody>
               {report.staffDaily.map((r, idx) => (
-                <tr key={`${r.staffName}-${r.serviceDate}-${idx}`}>
+                <tr
+                  key={`${r.staffName}-${r.serviceDate}-${idx}`}
+                  onClick={() => onOpenCompletedCalls?.({ staffName: r.staffName, serviceDate: r.serviceDate })}
+                  style={{ cursor: onOpenCompletedCalls ? "pointer" : "default" }}
+                  title={onOpenCompletedCalls ? "Click to view matching Water Service Call Completed list" : undefined}
+                >
                   <td>{r.staffName}</td>
-                  <td>{r.serviceDate}</td>
+                  <td>{formatServiceDate(r.serviceDate)}</td>
                   <td>{r.numCalls}</td>
                   <td>{fmt(r.totalAmount)}</td>
                 </tr>

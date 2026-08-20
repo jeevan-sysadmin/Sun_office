@@ -41,19 +41,43 @@ function saveHistory($historyFile, $history) {
     file_put_contents($historyFile, json_encode($history, JSON_PRETTY_PRINT));
 }
 
+function loadEnvConfig($envPath) {
+    $config = [];
+
+    if (!file_exists($envPath)) {
+        return $config;
+    }
+
+    $lines = file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    foreach ($lines as $line) {
+        $trimmed = trim($line);
+        if ($trimmed === '' || strpos($trimmed, '#') === 0) {
+            continue;
+        }
+
+        $parts = explode('=', $trimmed, 2);
+        if (count($parts) !== 2) {
+            continue;
+        }
+
+        $key = trim($parts[0]);
+        $value = trim($parts[1]);
+        $config[$key] = trim($value, "\"'");
+    }
+
+    return $config;
+}
+
 function exportDatabaseToSql($outputFile) {
-    $host = 'localhost';
-    $user = 'root';
-    $pass = '';
-    $dbName = 'sun_office';
+    $env = loadEnvConfig(dirname(__DIR__) . '/.env');
+    $host = $env['DB_HOST'] ?? 'localhost';
+    $user = $env['DB_USER'] ?? 'root';
+    $pass = $env['DB_PASSWORD'] ?? '';
+    $dbName = $env['DB_NAME'] ?? 'sun_office';
 
     $conn = new mysqli($host, $user, $pass, $dbName);
     if ($conn->connect_error) {
-        $dbName = 'sun_computers';
-        $conn = new mysqli($host, $user, $pass, $dbName);
-        if ($conn->connect_error) {
-            throw new Exception('Database connection failed');
-        }
+        throw new Exception('Database connection failed: ' . $conn->connect_error);
     }
 
     $conn->set_charset('utf8mb4');

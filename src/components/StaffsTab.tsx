@@ -80,6 +80,9 @@ interface Salary {
   salary_month: string;
   payment_method: string;
   transaction_id: string;
+  funding_source?: 'business_income' | 'raj_communication' | 'owner_cash' | 'other_borrowing';
+  funding_amount?: number;
+  funding_notes?: string;
   notes: string;
   paid_by: number;
   paid_by_name: string;
@@ -223,6 +226,9 @@ const StaffTab: React.FC<StaffTabProps> = ({
     transaction_id: '',
     bonus: '0',
     deductions: '0',
+    funding_source: 'raj_communication' as 'business_income' | 'raj_communication' | 'owner_cash' | 'other_borrowing',
+    funding_amount: '0',
+    funding_notes: '',
     notes: ''
   });
   const [editSalaryForm, setEditSalaryForm] = useState({
@@ -234,6 +240,9 @@ const StaffTab: React.FC<StaffTabProps> = ({
     transaction_id: '',
     bonus: '0',
     deductions: '0',
+    funding_source: 'raj_communication' as 'business_income' | 'raj_communication' | 'owner_cash' | 'other_borrowing',
+    funding_amount: '0',
+    funding_notes: '',
     notes: ''
   });
   
@@ -822,6 +831,9 @@ const StaffTab: React.FC<StaffTabProps> = ({
         bonus: bonus,
         deductions: deductions,
         net_amount: netAmount,
+        funding_source: salaryForm.funding_source,
+        funding_amount: salaryForm.funding_source === 'business_income' ? 0 : parseFloat(salaryForm.funding_amount || '0'),
+        funding_notes: salaryForm.funding_notes,
         notes: salaryForm.notes,
         paid_by: 1
       };
@@ -850,6 +862,9 @@ const StaffTab: React.FC<StaffTabProps> = ({
           transaction_id: '',
           bonus: '0',
           deductions: '0',
+          funding_source: 'raj_communication',
+          funding_amount: '0',
+          funding_notes: '',
           notes: ''
         });
 
@@ -963,6 +978,9 @@ const StaffTab: React.FC<StaffTabProps> = ({
       transaction_id: `TXN${Date.now()}`,
       bonus: '0',
       deductions: '0',
+      funding_source: 'raj_communication',
+      funding_amount: '0',
+      funding_notes: '',
       notes: ''
     });
     setShowSalaryModal(true);
@@ -979,6 +997,9 @@ const StaffTab: React.FC<StaffTabProps> = ({
       transaction_id: salary.transaction_id || '',
       bonus: String(salary.bonus ?? 0),
       deductions: String(salary.deductions ?? 0),
+      funding_source: salary.funding_source || 'business_income',
+      funding_amount: String(salary.funding_amount ?? 0),
+      funding_notes: salary.funding_notes || '',
       notes: salary.notes || ''
     });
     setShowEditSalaryModal(true);
@@ -1015,6 +1036,9 @@ const StaffTab: React.FC<StaffTabProps> = ({
         bonus,
         deductions,
         net_amount: netAmount,
+        funding_source: editSalaryForm.funding_source,
+        funding_amount: editSalaryForm.funding_source === 'business_income' ? 0 : parseFloat(editSalaryForm.funding_amount || '0'),
+        funding_notes: editSalaryForm.funding_notes,
         notes: editSalaryForm.notes,
         staff_id: selectedStaff.id,
         staff_name: selectedStaff.name
@@ -2142,6 +2166,61 @@ const StaffTab: React.FC<StaffTabProps> = ({
                         }}
                       />
                     </div>
+
+                    <div className="form-group" style={{ gridColumn: isMobile ? 'span 2' : 'auto' }}>
+                      <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: '500', color: '#374151' }}>
+                        <FiBriefcase style={{ display: 'inline', marginRight: '4px' }} />
+                        Salary Amount Source
+                      </label>
+                      <select
+                        value={salaryForm.funding_source}
+                        onChange={(e) => setSalaryForm({
+                          ...salaryForm,
+                          funding_source: e.target.value as 'business_income' | 'raj_communication' | 'owner_cash' | 'other_borrowing',
+                          funding_amount: e.target.value === 'business_income' ? '0' : salaryForm.funding_amount,
+                          funding_notes: e.target.value === 'business_income' ? '' : salaryForm.funding_notes
+                        })}
+                        style={{
+                          width: '100%',
+                          padding: '10px 12px',
+                          borderRadius: '8px',
+                          border: '1px solid #d1d5db',
+                          fontSize: '14px',
+                          outline: 'none',
+                          backgroundColor: '#fff'
+                        }}
+                      >
+                        <option value="raj_communication">Raj Electricals</option>
+                        <option value="business_income">Sun Office</option>
+                        <option value="owner_cash">Owner Cash</option>
+                        <option value="other_borrowing">Other Borrowing</option>
+                      </select>
+                    </div>
+
+                    <div className="form-group" style={{ gridColumn: isMobile ? 'span 2' : 'auto' }}>
+                      <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: '500', color: '#374151' }}>
+                        <FiDollarSign style={{ display: 'inline', marginRight: '4px' }} />
+                        Borrowed / Support Amount
+                      </label>
+                      <input
+                        type="number"
+                        value={salaryForm.funding_amount}
+                        onChange={(e) => setSalaryForm({...salaryForm, funding_amount: e.target.value})}
+                        placeholder="Amount taken from Raj Electricals"
+                        min="0"
+                        step="0.01"
+                        disabled={salaryForm.funding_source === 'business_income'}
+                        style={{
+                          width: '100%',
+                          padding: '10px 12px',
+                          borderRadius: '8px',
+                          border: '1px solid #d1d5db',
+                          fontSize: '14px',
+                          outline: 'none',
+                          backgroundColor: salaryForm.funding_source === 'business_income' ? '#f9fafb' : '#fff'
+                        }}
+                      />
+                    </div>
                   </div>
 
                   <div className="net-amount-card" style={{
@@ -2163,6 +2242,27 @@ const StaffTab: React.FC<StaffTabProps> = ({
                   </div>
 
                   <div className="form-group full-width">
+                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: '500', color: '#374151' }}>
+                      Funding Notes
+                    </label>
+                    <textarea
+                      value={salaryForm.funding_notes}
+                      onChange={(e) => setSalaryForm({...salaryForm, funding_notes: e.target.value})}
+                      placeholder="Example: Took Rs.5000 from Raj Electricals to complete salary payment"
+                      rows={2}
+                      disabled={salaryForm.funding_source === 'business_income'}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        borderRadius: '8px',
+                        border: '1px solid #d1d5db',
+                        fontSize: '14px',
+                        outline: 'none',
+                        resize: 'vertical',
+                        marginBottom: '12px',
+                        backgroundColor: salaryForm.funding_source === 'business_income' ? '#f9fafb' : '#fff'
+                      }}
+                    />
                     <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: '500', color: '#374151' }}>
                       <FiFileText style={{ display: 'inline', marginRight: '4px' }} />
                       Payment Notes
@@ -2914,7 +3014,15 @@ const StaffTab: React.FC<StaffTabProps> = ({
                 <input type="date" value={editSalaryForm.salary_date} onChange={(e) => setEditSalaryForm({ ...editSalaryForm, salary_date: e.target.value })} style={{ padding: '10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
                 <input type="number" placeholder="Bonus" value={editSalaryForm.bonus} onChange={(e) => setEditSalaryForm({ ...editSalaryForm, bonus: e.target.value })} style={{ padding: '10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
                 <input type="number" placeholder="Deductions" value={editSalaryForm.deductions} onChange={(e) => setEditSalaryForm({ ...editSalaryForm, deductions: e.target.value })} style={{ padding: '10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
+                <select value={editSalaryForm.funding_source} onChange={(e) => setEditSalaryForm({ ...editSalaryForm, funding_source: e.target.value as 'business_income' | 'raj_communication' | 'owner_cash' | 'other_borrowing', funding_amount: e.target.value === 'business_income' ? '0' : editSalaryForm.funding_amount, funding_notes: e.target.value === 'business_income' ? '' : editSalaryForm.funding_notes })} style={{ padding: '10px', border: '1px solid #d1d5db', borderRadius: '8px' }}>
+                  <option value="raj_communication">Raj Electricals</option>
+                  <option value="business_income">Sun Office</option>
+                  <option value="owner_cash">Owner Cash</option>
+                  <option value="other_borrowing">Other Borrowing</option>
+                </select>
+                <input type="number" placeholder="Borrowed / Support Amount" value={editSalaryForm.funding_amount} onChange={(e) => setEditSalaryForm({ ...editSalaryForm, funding_amount: e.target.value })} disabled={editSalaryForm.funding_source === 'business_income'} style={{ padding: '10px', border: '1px solid #d1d5db', borderRadius: '8px', backgroundColor: editSalaryForm.funding_source === 'business_income' ? '#f9fafb' : '#fff' }} />
                 <input type="text" placeholder="Transaction ID" value={editSalaryForm.transaction_id} onChange={(e) => setEditSalaryForm({ ...editSalaryForm, transaction_id: e.target.value })} style={{ gridColumn: isMobile ? 'span 1' : 'span 2', padding: '10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
+                <textarea placeholder="Funding Notes" value={editSalaryForm.funding_notes} onChange={(e) => setEditSalaryForm({ ...editSalaryForm, funding_notes: e.target.value })} disabled={editSalaryForm.funding_source === 'business_income'} style={{ gridColumn: isMobile ? 'span 1' : 'span 2', minHeight: '72px', padding: '10px', border: '1px solid #d1d5db', borderRadius: '8px', backgroundColor: editSalaryForm.funding_source === 'business_income' ? '#f9fafb' : '#fff' }} />
                 <textarea placeholder="Notes" value={editSalaryForm.notes} onChange={(e) => setEditSalaryForm({ ...editSalaryForm, notes: e.target.value })} style={{ gridColumn: isMobile ? 'span 1' : 'span 2', minHeight: '90px', padding: '10px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '16px' }}>
@@ -4322,20 +4430,6 @@ const StaffTab: React.FC<StaffTabProps> = ({
                       textTransform: 'uppercase',
                       letterSpacing: '0.05em'
                     }}>Joined Date</th>
-                    <th style={{
-                      padding: isTablet ? '12px' : '14px',
-                      textAlign: 'center',
-                      fontWeight: '600',
-                      color: '#000000',
-                      fontSize: isTablet ? '11px' : '12px',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em'
-                    }}>
-                      <div>Actions</div>
-                      <div style={{ fontSize: '10px', fontWeight: 500, color: '#111827', marginTop: '2px', letterSpacing: '0' }}>
-                        V View | S Salary | X Expense | E Edit | D Delete
-                      </div>
-                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -4444,148 +4538,6 @@ const StaffTab: React.FC<StaffTabProps> = ({
                           <span style={{ fontSize: isTablet ? '12px' : '13px', color: '#000000' }}>
                             {formatDate(staffMember.created_at)}
                           </span>
-                        </div>
-                      </td>
-                      <td style={{ padding: isTablet ? '12px' : '14px' }}>
-                        <div style={{
-                          display: 'flex',
-                          gap: isTablet ? '4px' : '6px',
-                          justifyContent: 'center',
-                          flexWrap: 'wrap'
-                        }}>
-                          <MotionButton 
-                            className="action-btn view"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleViewClick(e, staffMember);
-                            }}
-                            whileHover={{ scale: 1.1, backgroundColor: '#e0f2fe' }}
-                            whileTap={{ scale: 0.9 }}
-                            title="View Details (V)"
-                            style={{
-                              width: isTablet ? '30px' : '32px',
-                              height: isTablet ? '30px' : '32px',
-                              borderRadius: '6px',
-                              border: '1px solid #e5e7eb',
-                              backgroundColor: '#fff',
-                              color: '#3b82f6',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontSize: isTablet ? '13px' : '14px',
-                              transition: 'all 0.2s'
-                            }}
-                          >
-                            <FiEye />
-                          </MotionButton>
-                          <MotionButton 
-                            className="action-btn salary"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleViewSalaryHistory(staffMember);
-                            }}
-                            whileHover={{ scale: 1.1, backgroundColor: '#d1fae5' }}
-                            whileTap={{ scale: 0.9 }}
-                            title="View Salary History (S)"
-                            style={{
-                              width: isTablet ? '30px' : '32px',
-                              height: isTablet ? '30px' : '32px',
-                              borderRadius: '6px',
-                              border: '1px solid #e5e7eb',
-                              backgroundColor: '#fff',
-                              color: '#10b981',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontSize: isTablet ? '13px' : '14px',
-                              transition: 'all 0.2s'
-                            }}
-                          >
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <FiDollarSign />
-                              <span style={{ fontSize: '9px', fontWeight: 700 }}>S</span>
-                            </span>
-                          </MotionButton>
-                          <MotionButton 
-                            className="action-btn expense"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleViewExpenseHistory(staffMember);
-                            }}
-                            whileHover={{ scale: 1.1, backgroundColor: '#fef3c7' }}
-                            whileTap={{ scale: 0.9 }}
-                            title="View Expense History (X)"
-                            style={{
-                              width: isTablet ? '30px' : '32px',
-                              height: isTablet ? '30px' : '32px',
-                              borderRadius: '6px',
-                              border: '1px solid #e5e7eb',
-                              backgroundColor: '#fff',
-                              color: '#f59e0b',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontSize: isTablet ? '13px' : '14px',
-                              transition: 'all 0.2s'
-                            }}
-                          >
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <FiCreditCard />
-                              <span style={{ fontSize: '9px', fontWeight: 700 }}>X</span>
-                            </span>
-                          </MotionButton>
-                          <MotionButton 
-                            className="action-btn edit"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleEditClick(e, staffMember);
-                            }}
-                            whileHover={{ scale: 1.1, backgroundColor: '#fef3c7' }}
-                            whileTap={{ scale: 0.9 }}
-                            title="Edit Staff (E)"
-                            style={{
-                              width: isTablet ? '30px' : '32px',
-                              height: isTablet ? '30px' : '32px',
-                              borderRadius: '6px',
-                              border: '1px solid #e5e7eb',
-                              backgroundColor: '#fff',
-                              color: '#f59e0b',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontSize: isTablet ? '13px' : '14px',
-                              transition: 'all 0.2s'
-                            }}
-                          >
-                            <FiEdit2 />
-                          </MotionButton>
-                          <MotionButton 
-                            className="action-btn delete"
-                            onClick={(e) => handleDeleteClick(e, staffMember.id)}
-                            whileHover={{ scale: 1.1, backgroundColor: '#fee2e2' }}
-                            whileTap={{ scale: 0.9 }}
-                            title="Delete Staff (D)"
-                            style={{
-                              width: isTablet ? '30px' : '32px',
-                              height: isTablet ? '30px' : '32px',
-                              borderRadius: '6px',
-                              border: '1px solid #fecaca',
-                              backgroundColor: '#fff',
-                              color: '#ef4444',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontSize: isTablet ? '13px' : '14px',
-                              transition: 'all 0.2s'
-                            }}
-                          >
-                            <FiTrash2 />
-                          </MotionButton>
                         </div>
                       </td>
                     </MotionTr>

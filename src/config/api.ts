@@ -7,10 +7,16 @@ const normalizeApiBaseUrl = (value?: string): string => {
   return rawValue.replace(/\/+$/, "");
 };
 
+const buildDefaultApiBaseUrl = (): string => {
+  if (typeof window === "undefined") {
+    return "http://localhost/sun_office/api";
+  }
+
+  return `${window.location.origin}/sun_office/api`;
+};
+
 const fallbackApiBaseUrl =
-  typeof window !== "undefined"
-    ? `${window.location.origin}/sun_office/api`
-    : "http://cloud.anyrdp.in:3000/sun_office/api";
+  buildDefaultApiBaseUrl();
 
 export const API_BASE_URL = normalizeApiBaseUrl(
   import.meta.env.VITE_API_BASE_URL || fallbackApiBaseUrl

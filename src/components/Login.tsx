@@ -1,5 +1,6 @@
 // C:\Users\JEEVANLAROSH\Downloads\Sun computers\sun office\src\components\Login.tsx
 import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Sphere, Float, Stars, Ring } from "@react-three/drei";
 import { motion, AnimatePresence } from "framer-motion";
@@ -9,6 +10,47 @@ import * as THREE from "three";
 // Import your logo
 import sunLogo from "../assets/sunlogo.png";
 import { LOGIN_URL } from "../config/api";
+
+const appBasePath = (import.meta.env.BASE_URL || "/").replace(/\/+$/, "") || "/";
+
+const buildAppPath = (path: string) => {
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return appBasePath === "/" ? normalizedPath : `${appBasePath}${normalizedPath}`;
+};
+
+const normalizeAppRedirect = (redirectUrl?: string) => {
+  if (!redirectUrl) {
+    return buildAppPath("/dashboard");
+  }
+
+  // Keep same-origin redirects inside the deployed app base path.
+  if (/^https?:\/\//i.test(redirectUrl)) {
+    try {
+      const parsedUrl = new URL(redirectUrl, window.location.origin);
+
+      if (parsedUrl.origin !== window.location.origin) {
+        return redirectUrl;
+      }
+
+      const nextPath = parsedUrl.pathname.startsWith(appBasePath)
+        ? parsedUrl.pathname
+        : buildAppPath(parsedUrl.pathname);
+
+      return `${parsedUrl.origin}${nextPath}${parsedUrl.search}${parsedUrl.hash}`;
+    } catch (error) {
+      console.warn("Failed to parse redirect URL, falling back to dashboard:", error);
+      return buildAppPath("/dashboard");
+    }
+  }
+
+  if (redirectUrl.startsWith("/")) {
+    return redirectUrl.startsWith(appBasePath)
+      ? redirectUrl
+      : buildAppPath(redirectUrl);
+  }
+
+  return buildAppPath(redirectUrl);
+};
 
 // Type definitions based on your PHP API response
 interface User {
@@ -43,6 +85,23 @@ interface LoginProps {
   onLoginSuccess?: (role: string, userData: User) => void;
   onLogin?: (userData: User) => void;
 }
+
+const getAppRouteFromRedirect = (redirectUrl?: string) => {
+  const normalizedRedirect = normalizeAppRedirect(redirectUrl);
+
+  try {
+    const parsedUrl = new URL(normalizedRedirect, window.location.origin);
+    const basePrefix = appBasePath === "/" ? "" : appBasePath;
+    const routePath = basePrefix && parsedUrl.pathname.startsWith(basePrefix)
+      ? parsedUrl.pathname.slice(basePrefix.length) || "/"
+      : parsedUrl.pathname;
+
+    return `${routePath.startsWith("/") ? routePath : `/${routePath}`}${parsedUrl.search}${parsedUrl.hash}`;
+  } catch (error) {
+    console.warn("Failed to convert redirect to app route, falling back to dashboard:", error);
+    return "/dashboard";
+  }
+};
 
 // Enhanced 3D Background with Planets and Nebula
 function CosmicBackground() {
@@ -202,6 +261,7 @@ async function apiLogin(email: string, password: string): Promise<LoginResponse>
 }
 
 export default function Login({ onLoginSuccess, onLogin }: LoginProps) {
+  const navigate = useNavigate();
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [showPassword, setShowPassword] = useState<boolean>(false);
@@ -279,11 +339,14 @@ export default function Login({ onLoginSuccess, onLogin }: LoginProps) {
         }
         
         // Redirect to dashboard
-        const redirectUrl = data.redirect_to || data.dashboard_url || '/dashboard';
+        const redirectUrl = normalizeAppRedirect(
+          data.redirect_to || data.dashboard_url || "/dashboard"
+        );
+        const redirectRoute = getAppRouteFromRedirect(redirectUrl);
         
         // Show success message then redirect
         setTimeout(() => {
-          window.location.href = redirectUrl;
+          navigate(redirectRoute, { replace: true });
         }, 2000);
       } else {
         setLoginError(data.message || "Invalid email or password");

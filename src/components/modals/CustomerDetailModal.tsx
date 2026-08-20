@@ -16,7 +16,8 @@ import {
   FiTrendingUp,
   FiAward,
   FiCheck,
-  FiGlobe
+  FiGlobe,
+  FiTrash2
 } from "react-icons/fi";
 import type { Customer } from "../types";
 
@@ -25,13 +26,15 @@ interface CustomerDetailModalProps {
   onClose: () => void;
   customer: Customer | null;
   onEdit: () => void;
+  onDelete: () => void;
 }
 
 const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
   open,
   onClose,
   customer,
-  onEdit
+  onEdit,
+  onDelete
 }) => {
   const [copiedField, setCopiedField] = React.useState<string | null>(null);
   const [showFullAddress, setShowFullAddress] = React.useState(false);
@@ -130,6 +133,13 @@ const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
     }, 150);
   }, [handleClose, onEdit]);
 
+  const handleDeleteClick = useCallback(() => {
+    handleClose();
+    setTimeout(() => {
+      onDelete();
+    }, 150);
+  }, [handleClose, onDelete]);
+
   return (
     <AnimatePresence>
       {open && (
@@ -150,7 +160,7 @@ const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
             alignItems: 'center',
             justifyContent: 'center',
             zIndex: 1000,
-            padding: '20px'
+            padding: '12px'
           }}
           onClick={handleBackdropClick}
         >
@@ -163,9 +173,10 @@ const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
             style={{
               backgroundColor: 'white',
               borderRadius: '24px',
-              width: '100%',
-              maxWidth: '850px',
-              maxHeight: '90vh',
+              width: 'min(96vw, 1320px)',
+              maxWidth: '1320px',
+              minHeight: 'min(820px, 90vh)',
+              maxHeight: '96vh',
               overflow: 'hidden',
               boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
               pointerEvents: 'auto'
@@ -751,6 +762,28 @@ const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
                 }}
               >
                 Close
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={handleDeleteClick}
+                style={{
+                  padding: '12px 24px',
+                  borderRadius: '12px',
+                  border: '1px solid #fecaca',
+                  background: '#fef2f2',
+                  color: '#dc2626',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <FiTrash2 size={16} />
+                Delete Customer
               </motion.button>
               <motion.button
                 whileHover={{ scale: 1.02 }}

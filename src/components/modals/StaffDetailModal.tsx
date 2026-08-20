@@ -65,7 +65,10 @@ import {
   Build as BuildIcon,
   PictureAsPdf as PdfIcon,
   TableChart as CsvIcon,
-  Favorite as FavoriteIcon
+  Favorite as FavoriteIcon,
+  DeleteOutline as DeleteIcon,
+  AttachMoney as AttachMoneyIcon,
+  ReceiptLong as ReceiptLongIcon
 } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -338,6 +341,9 @@ interface Salary {
   bonus: number;
   deductions: number;
   net_amount: number;
+  funding_source?: string;
+  funding_amount?: number;
+  funding_notes?: string;
   notes: string;
   paid_by: number | null;
   paid_by_name: string;
@@ -385,6 +391,11 @@ interface StaffDetailModalProps {
   staff: User | null;
   onEdit?: () => void;
   onRefresh?: () => void;
+  onDelete?: () => void;
+  onAddSalary?: () => void;
+  onAddExpense?: () => void;
+  onEditSalary?: (salary: Salary) => void;
+  onEditExpense?: (expense: Expense) => void;
 }
 
 const StaffDetailModal: React.FC<StaffDetailModalProps> = ({
@@ -392,7 +403,12 @@ const StaffDetailModal: React.FC<StaffDetailModalProps> = ({
   onClose,
   staff,
   onEdit,
-  onRefresh
+  onRefresh,
+  onDelete,
+  onAddSalary,
+  onAddExpense,
+  onEditSalary,
+  onEditExpense
 }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
@@ -405,7 +421,7 @@ const StaffDetailModal: React.FC<StaffDetailModalProps> = ({
   const [tabValue, setTabValue] = useState(0);
   const [serviceFilter, setServiceFilter] = useState<'all' | 'water' | 'inverter'>('all');
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+  const [selectedMonth, setSelectedMonth] = useState<'all' | number>('all');
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarType, setSnackbarType] = useState<'success' | 'error' | 'info'>('success');
@@ -413,11 +429,40 @@ const StaffDetailModal: React.FC<StaffDetailModalProps> = ({
   const [waterLoading, setWaterLoading] = useState(false);
   const [waterYearlyTotal, setWaterYearlyTotal] = useState(0);
   const [waterYearlyCount, setWaterYearlyCount] = useState(0);
+  const [editingSalaryRecord, setEditingSalaryRecord] = useState<Salary | null>(null);
+  const [editingExpenseRecord, setEditingExpenseRecord] = useState<Expense | null>(null);
+  const [salaryEditForm, setSalaryEditForm] = useState({
+    service_type: 'water',
+    salary_month: '',
+    salary_date: '',
+    amount: '',
+    bonus: '0',
+    deductions: '0',
+    payment_method: 'bank_transfer',
+    transaction_id: '',
+    funding_source: 'raj_communication',
+    funding_amount: '0',
+    funding_notes: '',
+    notes: ''
+  });
+  const [expenseEditForm, setExpenseEditForm] = useState({
+    expense_type: 'others',
+    amount: '',
+    description: '',
+    expense_date: '',
+    payment_method: 'cash',
+    receipt_number: '',
+    notes: ''
+  });
 
   // Get month name from month number
   const getMonthName = (monthNumber: number): string => {
     const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
     return months[monthNumber - 1];
+  };
+
+  const getSelectedMonthLabel = (): string => {
+    return selectedMonth === 'all' ? 'All Months' : getMonthName(selectedMonth);
   };
 
   // Format salary month for display (YYYY-MM to Month YYYY)
@@ -455,6 +500,20 @@ const StaffDetailModal: React.FC<StaffDetailModalProps> = ({
       minimumFractionDigits: 0,
       maximumFractionDigits: 0
     }).format(amount);
+  };
+
+  const formatFundingSource = (source?: string): string => {
+    switch (source) {
+      case 'raj_communication':
+        return 'Raj Electricals';
+      case 'owner_cash':
+        return 'Owner Cash';
+      case 'other_borrowing':
+        return 'Other Borrowing';
+      case 'business_income':
+      default:
+        return 'Sun Office';
+    }
   };
 
   useEffect(() => {
@@ -518,6 +577,9 @@ const StaffDetailModal: React.FC<StaffDetailModalProps> = ({
           bonus: parseFloat(s.bonus) || 0,
           deductions: parseFloat(s.deductions) || 0,
           net_amount: parseFloat(s.net_amount) || parseFloat(s.amount) || 0,
+          funding_source: s.funding_source || 'business_income',
+          funding_amount: parseFloat(s.funding_amount) || 0,
+          funding_notes: s.funding_notes || '',
           notes: s.notes || '',
           paid_by: s.paid_by ? parseInt(s.paid_by) : null,
           paid_by_name: s.paid_by_name || 'System',
@@ -606,8 +668,10 @@ const StaffDetailModal: React.FC<StaffDetailModalProps> = ({
 
     setWaterLoading(true);
     try {
-      const month = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
-      const response = await fetch(`${API_BASE_URL}/water_services.php?action=staff_monthly_summary&month=${month}`, {
+      const monthParam = selectedMonth === 'all'
+        ? selectedYear
+        : `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
+      const response = await fetch(`${API_BASE_URL}/water_services.php?action=staff_monthly_summary&month=${monthParam}`, {
         method: 'GET',
         headers: { 'Accept': 'application/json' }
       });
@@ -655,7 +719,9 @@ const StaffDetailModal: React.FC<StaffDetailModalProps> = ({
 
           if (!staffMatch || !p.service_date) return false;
           const d = new Date(p.service_date);
-          return d.getFullYear().toString() === selectedYear;
+          if (d.getFullYear().toString() !== selectedYear) return false;
+          if (selectedMonth === 'all') return true;
+          return d.getMonth() + 1 === selectedMonth;
         });
 
         const yearTotal = yearlyFiltered.reduce((sum: number, p: any) => sum + (parseFloat(p.amount) || 0), 0);
@@ -739,7 +805,9 @@ const StaffDetailModal: React.FC<StaffDetailModalProps> = ({
     if (monthKey) {
       const [year, month] = monthKey.split('-');
       const parsedMonth = parseInt(month, 10);
-      return parsedMonth === selectedMonth && year === selectedYear;
+      if (year !== selectedYear) return false;
+      if (selectedMonth === 'all') return true;
+      return parsedMonth === selectedMonth;
     }
     return false;
   });
@@ -759,7 +827,9 @@ const StaffDetailModal: React.FC<StaffDetailModalProps> = ({
       const expenseMonth = expenseDate.getMonth() + 1;
       const expenseYear = expenseDate.getFullYear().toString();
       
-      return expenseMonth === selectedMonth && expenseYear === selectedYear;
+      if (expenseYear !== selectedYear) return false;
+      if (selectedMonth === 'all') return true;
+      return expenseMonth === selectedMonth;
     }
     return false;
   });
@@ -768,10 +838,26 @@ const StaffDetailModal: React.FC<StaffDetailModalProps> = ({
   const calculateTotals = () => {
     const totalSalary = filteredSalaries.reduce((sum, s) => sum + s.net_amount, 0);
     const totalExpenses = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
+    const rajElectricalsSalary = filteredSalaries.reduce((sum, s) => {
+      if (s.funding_source === 'raj_communication') {
+        return sum + (s.funding_amount || 0);
+      }
+      return sum;
+    }, 0);
+    const otherFundingSalary = filteredSalaries.reduce((sum, s) => {
+      if (s.funding_source && s.funding_source !== 'business_income' && s.funding_source !== 'raj_communication') {
+        return sum + (s.funding_amount || 0);
+      }
+      return sum;
+    }, 0);
+    const sunOfficeSalary = totalSalary - rajElectricalsSalary - otherFundingSalary;
 
     return {
       totalSalary,
       totalExpenses,
+      sunOfficeSalary,
+      rajElectricalsSalary,
+      otherFundingSalary,
       averageSalary: filteredSalaries.length > 0 ? totalSalary / filteredSalaries.length : 0,
       totalNetProfit: totalSalary - totalExpenses
     };
@@ -786,6 +872,174 @@ const StaffDetailModal: React.FC<StaffDetailModalProps> = ({
     setSnackbarType(type);
     setSnackbarOpen(true);
     setTimeout(() => setSnackbarOpen(false), 3000);
+  };
+
+  const openSalaryEditDialog = (salary: Salary) => {
+    setEditingSalaryRecord(salary);
+    setSalaryEditForm({
+      service_type: salary.service_type || 'water',
+      salary_month: salary.salary_month || '',
+      salary_date: salary.salary_date || '',
+      amount: String(salary.amount ?? ''),
+      bonus: String(salary.bonus ?? 0),
+      deductions: String(salary.deductions ?? 0),
+      payment_method: salary.payment_method || 'bank_transfer',
+      transaction_id: salary.transaction_id || '',
+      funding_source: salary.funding_source || 'raj_communication',
+      funding_amount: String(salary.funding_amount ?? 0),
+      funding_notes: salary.funding_notes || '',
+      notes: salary.notes || ''
+    });
+  };
+
+  const openExpenseEditDialog = (expense: Expense) => {
+    setEditingExpenseRecord(expense);
+    setExpenseEditForm({
+      expense_type: expense.expense_type || 'others',
+      amount: String(expense.amount ?? ''),
+      description: expense.description || '',
+      expense_date: expense.expense_date || '',
+      payment_method: expense.payment_method || 'cash',
+      receipt_number: expense.receipt_number || '',
+      notes: expense.notes || ''
+    });
+  };
+
+  const handleSalaryUpdate = async () => {
+    if (!editingSalaryRecord || !staff) return;
+
+    try {
+      setLoading(true);
+
+      const response = await fetch(`${API_BASE_URL}/salary.php?id=${editingSalaryRecord.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          staff_id: staff.id,
+          staff_name: staff.name,
+          service_type: salaryEditForm.service_type,
+          amount: parseFloat(salaryEditForm.amount || '0'),
+          salary_date: salaryEditForm.salary_date,
+          salary_month: salaryEditForm.salary_month,
+          payment_method: salaryEditForm.payment_method,
+          transaction_id: salaryEditForm.transaction_id,
+          funding_source: salaryEditForm.funding_source,
+          funding_amount: salaryEditForm.funding_source === 'business_income' ? 0 : parseFloat(salaryEditForm.funding_amount || '0'),
+          funding_notes: salaryEditForm.funding_notes,
+          bonus: parseFloat(salaryEditForm.bonus || '0'),
+          deductions: parseFloat(salaryEditForm.deductions || '0'),
+          notes: salaryEditForm.notes
+        })
+      });
+
+      const data = await response.json();
+      if (!data.success) {
+        throw new Error(data.message || 'Failed to update salary');
+      }
+
+      setEditingSalaryRecord(null);
+      showSnackbar('Salary updated successfully.', 'success');
+      await loadStaffData();
+      onRefresh?.();
+    } catch (error) {
+      console.error('Error updating salary:', error);
+      showSnackbar(error instanceof Error ? error.message : 'Failed to update salary.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleExpenseUpdate = async () => {
+    if (!editingExpenseRecord || !staff) return;
+
+    try {
+      setLoading(true);
+
+      const response = await fetch(`${API_BASE_URL}/expenses.php?id=${editingExpenseRecord.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          staff_id: staff.id,
+          staff_name: staff.name,
+          expense_type: expenseEditForm.expense_type,
+          amount: parseFloat(expenseEditForm.amount || '0'),
+          description: expenseEditForm.description,
+          expense_date: expenseEditForm.expense_date,
+          payment_method: expenseEditForm.payment_method,
+          receipt_number: expenseEditForm.receipt_number || null,
+          notes: expenseEditForm.notes
+        })
+      });
+
+      const data = await response.json();
+      if (!data.success) {
+        throw new Error(data.message || 'Failed to update expense');
+      }
+
+      setEditingExpenseRecord(null);
+      showSnackbar('Expense updated successfully.', 'success');
+      await loadStaffData();
+      onRefresh?.();
+    } catch (error) {
+      console.error('Error updating expense:', error);
+      showSnackbar(error instanceof Error ? error.message : 'Failed to update expense.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteSalary = async (salary: Salary) => {
+    const confirmed = window.confirm(`Delete salary record for ${salary.staff_name} on ${formatDate(salary.salary_date)}?`);
+    if (!confirmed) return;
+
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_BASE_URL}/salary.php?id=${salary.id}`, {
+        method: 'DELETE',
+        headers: { 'Accept': 'application/json' }
+      });
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.message || 'Failed to delete salary');
+      }
+
+      showSnackbar('Salary deleted successfully.', 'success');
+      await loadStaffData();
+      onRefresh?.();
+    } catch (error) {
+      console.error('Error deleting salary:', error);
+      showSnackbar(error instanceof Error ? error.message : 'Failed to delete salary.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteExpense = async (expense: Expense) => {
+    const confirmed = window.confirm(`Delete expense record for ${expense.staff_name} on ${formatDate(expense.expense_date)}?`);
+    if (!confirmed) return;
+
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_BASE_URL}/expenses.php?id=${expense.id}`, {
+        method: 'DELETE',
+        headers: { 'Accept': 'application/json' }
+      });
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.message || 'Failed to delete expense');
+      }
+
+      showSnackbar('Expense deleted successfully.', 'success');
+      await loadStaffData();
+      onRefresh?.();
+    } catch (error) {
+      console.error('Error deleting expense:', error);
+      showSnackbar(error instanceof Error ? error.message : 'Failed to delete expense.', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Download CSV
@@ -1544,6 +1798,79 @@ const StaffDetailModal: React.FC<StaffDetailModalProps> = ({
         overflowY: 'auto',
         maxHeight: isMobile ? 'calc(100vh - 120px)' : 'calc(90vh - 140px)'
       }}>
+        {(onAddSalary || onAddExpense || onEdit || onDelete) && (
+          <Box
+            sx={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 1.5,
+              mb: isMobile ? 2 : 3,
+            }}
+          >
+            {onAddSalary && (
+              <Button
+                variant="contained"
+                startIcon={<AttachMoneyIcon />}
+                onClick={onAddSalary}
+                sx={{
+                  borderRadius: 999,
+                  textTransform: 'none',
+                  fontWeight: 700,
+                  bgcolor: '#10b981',
+                  '&:hover': { bgcolor: '#059669' }
+                }}
+              >
+                Add Salary
+              </Button>
+            )}
+            {onAddExpense && (
+              <Button
+                variant="contained"
+                startIcon={<ReceiptLongIcon />}
+                onClick={onAddExpense}
+                sx={{
+                  borderRadius: 999,
+                  textTransform: 'none',
+                  fontWeight: 700,
+                  bgcolor: '#f59e0b',
+                  '&:hover': { bgcolor: '#d97706' }
+                }}
+              >
+                Add Expense
+              </Button>
+            )}
+            {onEdit && (
+              <Button
+                variant="outlined"
+                startIcon={<EditIcon />}
+                onClick={onEdit}
+                sx={{
+                  borderRadius: 999,
+                  textTransform: 'none',
+                  fontWeight: 700
+                }}
+              >
+                Edit Staff
+              </Button>
+            )}
+            {onDelete && (
+              <Button
+                variant="outlined"
+                color="error"
+                startIcon={<DeleteIcon />}
+                onClick={onDelete}
+                sx={{
+                  borderRadius: 999,
+                  textTransform: 'none',
+                  fontWeight: 700
+                }}
+              >
+                Delete Staff
+              </Button>
+            )}
+          </Box>
+        )}
+
         {/* Loading State */}
         {loading && (
           <Fade in={loading}>
@@ -1945,6 +2272,23 @@ const StaffDetailModal: React.FC<StaffDetailModalProps> = ({
                       <Typography variant="caption" color="textSecondary" display="block" mt={0.5}>
                         {filteredSalaries.length} payments
                       </Typography>
+                      <Typography variant="caption" display="block" mt={0.75} sx={{ color: '#0f766e', fontWeight: 600 }}>
+                        Sun Office: {formatCurrency(totals.sunOfficeSalary)}
+                        {totals.rajElectricalsSalary > 0 ? ' +' : ''}
+                      </Typography>
+                      {totals.rajElectricalsSalary > 0 && (
+                        <Typography variant="caption" display="block" sx={{ color: '#b91c1c', fontWeight: 600 }}>
+                          Raj Electricals: {formatCurrency(totals.rajElectricalsSalary)}
+                        </Typography>
+                      )}
+                      {totals.otherFundingSalary > 0 && (
+                        <Typography variant="caption" display="block" sx={{ color: '#7c3aed', fontWeight: 600 }}>
+                          Other Support: {formatCurrency(totals.otherFundingSalary)}
+                        </Typography>
+                      )}
+                      <Typography variant="caption" display="block" sx={{ color: '#111827', fontWeight: 700 }}>
+                        Total: {formatCurrency(totals.totalSalary)}
+                      </Typography>
                     </Box>
                     <Avatar sx={{ bgcolor: alpha('#10b981', 0.1), color: '#10b981', width: isMobile ? 40 : 56, height: isMobile ? 40 : 56 }}>
                       <MoneyIcon sx={{ fontSize: isMobile ? 20 : 28 }} />
@@ -2114,10 +2458,11 @@ const StaffDetailModal: React.FC<StaffDetailModalProps> = ({
               <Select
                 labelId="month-select-label"
                 value={selectedMonth}
-                onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                onChange={(e) => setSelectedMonth(e.target.value === 'all' ? 'all' : Number(e.target.value))}
                 label="Month"
                 sx={{ borderRadius: 2 }}
               >
+                <MenuItem value="all">All Months</MenuItem>
                 {months.map((month) => (
                   <MenuItem key={month} value={month}>{getMonthName(month)}</MenuItem>
                 ))}
@@ -2189,8 +2534,8 @@ const StaffDetailModal: React.FC<StaffDetailModalProps> = ({
                       </Typography>
                       <Typography variant="body2" color="textSecondary">
                         {serviceFilter !== 'all' 
-                          ? `No ${serviceFilter} service salary records found for ${getMonthName(selectedMonth)} ${selectedYear}`
-                          : `No salary records found for ${getMonthName(selectedMonth)} ${selectedYear}`}
+                          ? `No ${serviceFilter} service salary records found for ${getSelectedMonthLabel()} ${selectedYear}`
+                          : `No salary records found for ${getSelectedMonthLabel()} ${selectedYear}`}
                       </Typography>
                     </Box>
                   ) : (
@@ -2212,10 +2557,14 @@ const StaffDetailModal: React.FC<StaffDetailModalProps> = ({
                             <StyledTableCell className="header">Method</StyledTableCell>
                             {!isMobile && (
                               <>
+                                <StyledTableCell className="header">Transaction ID</StyledTableCell>
                                 <StyledTableCell className="header">Paid By</StyledTableCell>
-                                <StyledTableCell className="header">Notes</StyledTableCell>
+                                <StyledTableCell className="header">Funding Notes</StyledTableCell>
+                                <StyledTableCell className="header">Payment Notes</StyledTableCell>
+                                <StyledTableCell className="header">Paid At</StyledTableCell>
                               </>
                             )}
+                            <StyledTableCell className="header" align="center">Actions</StyledTableCell>
                           </TableRow>
                         </TableHead>
                         <TableBody>
@@ -2284,38 +2633,135 @@ const StaffDetailModal: React.FC<StaffDetailModalProps> = ({
                                   </Typography>
                                 </TableCell>
                                 <TableCell>
-                                  <Chip
-                                    label={salary.payment_method.replace(/_/g, ' ').toUpperCase()}
-                                    size="small"
-                                    variant="outlined"
-                                    sx={{ 
-                                      fontWeight: 600,
-                                      borderColor: '#667eea',
-                                      color: '#667eea',
-                                      fontSize: isMobile ? '0.65rem' : '0.7rem'
-                                    }}
-                                  />
+                                  <Box display="flex" gap={0.75} flexWrap="wrap">
+                                    <Chip
+                                      label={salary.payment_method.replace(/_/g, ' ').toUpperCase()}
+                                      size="small"
+                                      variant="outlined"
+                                      sx={{ 
+                                        fontWeight: 600,
+                                        borderColor: '#667eea',
+                                        color: '#667eea',
+                                        fontSize: isMobile ? '0.65rem' : '0.7rem'
+                                      }}
+                                    />
+                                    <Chip
+                                      label={formatFundingSource(salary.funding_source)}
+                                      size="small"
+                                      sx={{
+                                        fontWeight: 600,
+                                        backgroundColor: salary.funding_source === 'raj_communication' ? '#fee2e2' : '#e0f2fe',
+                                        color: salary.funding_source === 'raj_communication' ? '#b91c1c' : '#0369a1',
+                                        fontSize: isMobile ? '0.65rem' : '0.7rem'
+                                      }}
+                                    />
+                                    {(salary.funding_amount || 0) > 0 && (
+                                      <Chip
+                                        label={`Funded ${formatCurrency(salary.funding_amount || 0)}`}
+                                        size="small"
+                                        sx={{
+                                          fontWeight: 600,
+                                          backgroundColor: '#fef3c7',
+                                          color: '#92400e',
+                                          fontSize: isMobile ? '0.65rem' : '0.7rem'
+                                        }}
+                                      />
+                                    )}
+                                  </Box>
+                                  {isMobile && (
+                                    <Box sx={{ mt: 1, display: 'grid', gap: 0.5 }}>
+                                      <Typography variant="caption" sx={{ color: '#4b5563', fontWeight: 600 }}>
+                                        TXN: {salary.transaction_id || '-'}
+                                      </Typography>
+                                      <Typography variant="caption" sx={{ color: '#4b5563' }}>
+                                        Paid By: {salary.paid_by_name || '-'}
+                                      </Typography>
+                                      {salary.funding_notes && (
+                                        <Typography variant="caption" sx={{ color: '#92400e' }}>
+                                          Funding: {salary.funding_notes}
+                                        </Typography>
+                                      )}
+                                      {salary.notes && (
+                                        <Typography variant="caption" sx={{ color: '#4338ca' }}>
+                                          Notes: {salary.notes}
+                                        </Typography>
+                                      )}
+                                    </Box>
+                                  )}
                                 </TableCell>
                                 {!isMobile && (
                                   <>
+                                    <TableCell>
+                                      <Typography
+                                        variant="body2"
+                                        fontWeight="600"
+                                        sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}
+                                      >
+                                        {salary.transaction_id || '-'}
+                                      </Typography>
+                                    </TableCell>
                                     <TableCell>
                                       <Typography variant="body2" fontWeight="500">
                                         {salary.paid_by_name}
                                       </Typography>
                                     </TableCell>
                                     <TableCell>
-                                      <Tooltip title={salary.notes || 'No notes'}>
-                                        <DescriptionIcon 
-                                          sx={{ 
-                                            color: salary.notes ? '#667eea' : '#E5E7EB', 
-                                            fontSize: 16,
-                                            cursor: 'help'
-                                          }} 
-                                        />
-                                      </Tooltip>
+                                      <Typography
+                                        variant="body2"
+                                        sx={{ color: salary.funding_notes ? '#92400e' : '#9CA3AF', maxWidth: 180 }}
+                                      >
+                                        {salary.funding_notes || '-'}
+                                      </Typography>
+                                    </TableCell>
+                                    <TableCell>
+                                      <Typography
+                                        variant="body2"
+                                        sx={{ color: salary.notes ? '#4338ca' : '#9CA3AF', maxWidth: 180 }}
+                                      >
+                                        {salary.notes || '-'}
+                                      </Typography>
+                                    </TableCell>
+                                    <TableCell>
+                                      <Typography variant="body2" sx={{ whiteSpace: 'nowrap' }}>
+                                        {formatDate(salary.paid_at)}
+                                      </Typography>
                                     </TableCell>
                                   </>
                                 )}
+                                <TableCell align="center">
+                                  <Box display="flex" justifyContent="center" gap={1}>
+                                    <Tooltip title="Edit Salary" arrow>
+                                      <IconButton
+                                        size="small"
+                                        onClick={() => onEditSalary ? onEditSalary(salary) : openSalaryEditDialog(salary)}
+                                        sx={{
+                                          color: '#2563eb',
+                                          bgcolor: alpha('#2563eb', 0.08),
+                                          '&:hover': {
+                                            bgcolor: alpha('#2563eb', 0.16)
+                                          }
+                                        }}
+                                      >
+                                        <EditIcon fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
+                                    <Tooltip title="Delete Salary" arrow>
+                                      <IconButton
+                                        size="small"
+                                        onClick={() => handleDeleteSalary(salary)}
+                                        sx={{
+                                          color: '#dc2626',
+                                          bgcolor: alpha('#dc2626', 0.08),
+                                          '&:hover': {
+                                            bgcolor: alpha('#dc2626', 0.16)
+                                          }
+                                        }}
+                                      >
+                                        <DeleteIcon fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
+                                  </Box>
+                                </TableCell>
                               </TableRow>
                             );
                           })}
@@ -2356,8 +2802,8 @@ const StaffDetailModal: React.FC<StaffDetailModalProps> = ({
                       </Typography>
                       <Typography variant="body2" color="textSecondary">
                         {serviceFilter !== 'all' 
-                          ? `No ${serviceFilter} service expense records found for ${getMonthName(selectedMonth)} ${selectedYear}`
-                          : `No expense records found for ${getMonthName(selectedMonth)} ${selectedYear}`}
+                          ? `No ${serviceFilter} service expense records found for ${getSelectedMonthLabel()} ${selectedYear}`
+                          : `No expense records found for ${getSelectedMonthLabel()} ${selectedYear}`}
                       </Typography>
                     </Box>
                   ) : (
@@ -2371,6 +2817,7 @@ const StaffDetailModal: React.FC<StaffDetailModalProps> = ({
                             {!isMobile && <StyledTableCell className="header">Description</StyledTableCell>}
                             <StyledTableCell className="header" align="right">Amount</StyledTableCell>
                             {!isMobile && <StyledTableCell className="header">Notes</StyledTableCell>}
+                            <StyledTableCell className="header" align="center">Actions</StyledTableCell>
                           </TableRow>
                         </TableHead>
                         <TableBody>
@@ -2435,6 +2882,40 @@ const StaffDetailModal: React.FC<StaffDetailModalProps> = ({
                                   </Tooltip>
                                 </TableCell>
                               )}
+                              <TableCell align="center">
+                                <Box display="flex" justifyContent="center" gap={1}>
+                                  <Tooltip title="Edit Expense" arrow>
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => onEditExpense ? onEditExpense(expense) : openExpenseEditDialog(expense)}
+                                      sx={{
+                                        color: '#ea580c',
+                                        bgcolor: alpha('#ea580c', 0.08),
+                                        '&:hover': {
+                                          bgcolor: alpha('#ea580c', 0.16)
+                                        }
+                                      }}
+                                    >
+                                      <EditIcon fontSize="small" />
+                                    </IconButton>
+                                  </Tooltip>
+                                  <Tooltip title="Delete Expense" arrow>
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => handleDeleteExpense(expense)}
+                                      sx={{
+                                        color: '#dc2626',
+                                        bgcolor: alpha('#dc2626', 0.08),
+                                        '&:hover': {
+                                          bgcolor: alpha('#dc2626', 0.16)
+                                        }
+                                      }}
+                                    >
+                                      <DeleteIcon fontSize="small" />
+                                    </IconButton>
+                                  </Tooltip>
+                                </Box>
+                              </TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
@@ -2499,7 +2980,7 @@ const StaffDetailModal: React.FC<StaffDetailModalProps> = ({
                             No water payment records found
                           </Typography>
                           <Typography variant="body2" color="textSecondary">
-                            No water payment records for {getMonthName(selectedMonth)} {selectedYear}
+                            No water payment records for {getSelectedMonthLabel()} {selectedYear}
                           </Typography>
                         </Box>
                       ) : (
@@ -2572,6 +3053,122 @@ const StaffDetailModal: React.FC<StaffDetailModalProps> = ({
           </Box>
         </Paper>
       </DialogContent>
+
+      <Dialog open={!!editingSalaryRecord} onClose={() => setEditingSalaryRecord(null)} maxWidth="sm" fullWidth>
+        <DialogContent sx={{ p: 3 }}>
+          <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>Edit Salary</Typography>
+          <Box sx={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 2 }}>
+            <Box>
+              <Typography variant="caption" color="textSecondary">Service</Typography>
+              <select value={salaryEditForm.service_type} onChange={(e) => setSalaryEditForm({ ...salaryEditForm, service_type: e.target.value })} style={{ width: '100%', marginTop: 6, padding: '10px', borderRadius: '8px', border: '1px solid #d1d5db' }}>
+                <option value="water">Water</option>
+                <option value="inverter">Inverter</option>
+              </select>
+            </Box>
+            <Box>
+              <Typography variant="caption" color="textSecondary">Salary Month</Typography>
+              <input type="month" value={salaryEditForm.salary_month} onChange={(e) => setSalaryEditForm({ ...salaryEditForm, salary_month: e.target.value })} style={{ width: '100%', marginTop: 6, padding: '10px', borderRadius: '8px', border: '1px solid #d1d5db' }} />
+            </Box>
+            <Box>
+              <Typography variant="caption" color="textSecondary">Paid Date</Typography>
+              <input type="date" value={salaryEditForm.salary_date} onChange={(e) => setSalaryEditForm({ ...salaryEditForm, salary_date: e.target.value })} style={{ width: '100%', marginTop: 6, padding: '10px', borderRadius: '8px', border: '1px solid #d1d5db' }} />
+            </Box>
+            <Box>
+              <Typography variant="caption" color="textSecondary">Amount</Typography>
+              <input type="number" value={salaryEditForm.amount} onChange={(e) => setSalaryEditForm({ ...salaryEditForm, amount: e.target.value })} style={{ width: '100%', marginTop: 6, padding: '10px', borderRadius: '8px', border: '1px solid #d1d5db' }} />
+            </Box>
+            <Box>
+              <Typography variant="caption" color="textSecondary">Bonus</Typography>
+              <input type="number" value={salaryEditForm.bonus} onChange={(e) => setSalaryEditForm({ ...salaryEditForm, bonus: e.target.value })} style={{ width: '100%', marginTop: 6, padding: '10px', borderRadius: '8px', border: '1px solid #d1d5db' }} />
+            </Box>
+            <Box>
+              <Typography variant="caption" color="textSecondary">Deductions</Typography>
+              <input type="number" value={salaryEditForm.deductions} onChange={(e) => setSalaryEditForm({ ...salaryEditForm, deductions: e.target.value })} style={{ width: '100%', marginTop: 6, padding: '10px', borderRadius: '8px', border: '1px solid #d1d5db' }} />
+            </Box>
+            <Box>
+              <Typography variant="caption" color="textSecondary">Payment Method</Typography>
+              <select value={salaryEditForm.payment_method} onChange={(e) => setSalaryEditForm({ ...salaryEditForm, payment_method: e.target.value })} style={{ width: '100%', marginTop: 6, padding: '10px', borderRadius: '8px', border: '1px solid #d1d5db' }}>
+                <option value="bank_transfer">Bank Transfer</option>
+                <option value="cash">Cash</option>
+                <option value="card">Card</option>
+              </select>
+            </Box>
+            <Box>
+              <Typography variant="caption" color="textSecondary">Transaction ID</Typography>
+              <input type="text" value={salaryEditForm.transaction_id} onChange={(e) => setSalaryEditForm({ ...salaryEditForm, transaction_id: e.target.value })} style={{ width: '100%', marginTop: 6, padding: '10px', borderRadius: '8px', border: '1px solid #d1d5db' }} />
+            </Box>
+            <Box>
+              <Typography variant="caption" color="textSecondary">Amount Source</Typography>
+              <select value={salaryEditForm.funding_source} onChange={(e) => setSalaryEditForm({ ...salaryEditForm, funding_source: e.target.value, funding_amount: e.target.value === 'business_income' ? '0' : salaryEditForm.funding_amount })} style={{ width: '100%', marginTop: 6, padding: '10px', borderRadius: '8px', border: '1px solid #d1d5db' }}>
+                <option value="raj_communication">Raj Electricals</option>
+                <option value="business_income">Sun Office</option>
+                <option value="owner_cash">Owner Cash</option>
+                <option value="other_borrowing">Other Borrowing</option>
+              </select>
+            </Box>
+            <Box>
+              <Typography variant="caption" color="textSecondary">Support Amount</Typography>
+              <input type="number" value={salaryEditForm.funding_amount} onChange={(e) => setSalaryEditForm({ ...salaryEditForm, funding_amount: e.target.value })} disabled={salaryEditForm.funding_source === 'business_income'} style={{ width: '100%', marginTop: 6, padding: '10px', borderRadius: '8px', border: '1px solid #d1d5db', backgroundColor: salaryEditForm.funding_source === 'business_income' ? '#f9fafb' : '#fff' }} />
+            </Box>
+            <Box sx={{ gridColumn: isMobile ? 'span 1' : 'span 2' }}>
+              <Typography variant="caption" color="textSecondary">Funding Notes</Typography>
+              <textarea value={salaryEditForm.funding_notes} onChange={(e) => setSalaryEditForm({ ...salaryEditForm, funding_notes: e.target.value })} rows={2} style={{ width: '100%', marginTop: 6, padding: '10px', borderRadius: '8px', border: '1px solid #d1d5db', resize: 'vertical' }} />
+            </Box>
+            <Box sx={{ gridColumn: isMobile ? 'span 1' : 'span 2' }}>
+              <Typography variant="caption" color="textSecondary">Notes</Typography>
+              <textarea value={salaryEditForm.notes} onChange={(e) => setSalaryEditForm({ ...salaryEditForm, notes: e.target.value })} rows={3} style={{ width: '100%', marginTop: 6, padding: '10px', borderRadius: '8px', border: '1px solid #d1d5db', resize: 'vertical' }} />
+            </Box>
+          </Box>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5, mt: 3 }}>
+            <Button variant="outlined" onClick={() => setEditingSalaryRecord(null)}>Cancel</Button>
+            <Button variant="contained" onClick={handleSalaryUpdate} sx={{ bgcolor: '#2563eb' }}>Update Salary</Button>
+          </Box>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!editingExpenseRecord} onClose={() => setEditingExpenseRecord(null)} maxWidth="sm" fullWidth>
+        <DialogContent sx={{ p: 3 }}>
+          <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>Edit Expense</Typography>
+          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr', gap: 2 }}>
+            <Box>
+              <Typography variant="caption" color="textSecondary">Expense Type</Typography>
+              <input type="text" value={expenseEditForm.expense_type} onChange={(e) => setExpenseEditForm({ ...expenseEditForm, expense_type: e.target.value })} style={{ width: '100%', marginTop: 6, padding: '10px', borderRadius: '8px', border: '1px solid #d1d5db' }} />
+            </Box>
+            <Box>
+              <Typography variant="caption" color="textSecondary">Amount</Typography>
+              <input type="number" value={expenseEditForm.amount} onChange={(e) => setExpenseEditForm({ ...expenseEditForm, amount: e.target.value })} style={{ width: '100%', marginTop: 6, padding: '10px', borderRadius: '8px', border: '1px solid #d1d5db' }} />
+            </Box>
+            <Box>
+              <Typography variant="caption" color="textSecondary">Expense Date</Typography>
+              <input type="date" value={expenseEditForm.expense_date} onChange={(e) => setExpenseEditForm({ ...expenseEditForm, expense_date: e.target.value })} style={{ width: '100%', marginTop: 6, padding: '10px', borderRadius: '8px', border: '1px solid #d1d5db' }} />
+            </Box>
+            <Box>
+              <Typography variant="caption" color="textSecondary">Payment Method</Typography>
+              <select value={expenseEditForm.payment_method} onChange={(e) => setExpenseEditForm({ ...expenseEditForm, payment_method: e.target.value })} style={{ width: '100%', marginTop: 6, padding: '10px', borderRadius: '8px', border: '1px solid #d1d5db' }}>
+                <option value="cash">Cash</option>
+                <option value="bank_transfer">Bank Transfer</option>
+                <option value="card">Card</option>
+              </select>
+            </Box>
+            <Box>
+              <Typography variant="caption" color="textSecondary">Description</Typography>
+              <textarea value={expenseEditForm.description} onChange={(e) => setExpenseEditForm({ ...expenseEditForm, description: e.target.value })} rows={2} style={{ width: '100%', marginTop: 6, padding: '10px', borderRadius: '8px', border: '1px solid #d1d5db', resize: 'vertical' }} />
+            </Box>
+            <Box>
+              <Typography variant="caption" color="textSecondary">Receipt Number</Typography>
+              <input type="text" value={expenseEditForm.receipt_number} onChange={(e) => setExpenseEditForm({ ...expenseEditForm, receipt_number: e.target.value })} style={{ width: '100%', marginTop: 6, padding: '10px', borderRadius: '8px', border: '1px solid #d1d5db' }} />
+            </Box>
+            <Box>
+              <Typography variant="caption" color="textSecondary">Notes</Typography>
+              <textarea value={expenseEditForm.notes} onChange={(e) => setExpenseEditForm({ ...expenseEditForm, notes: e.target.value })} rows={3} style={{ width: '100%', marginTop: 6, padding: '10px', borderRadius: '8px', border: '1px solid #d1d5db', resize: 'vertical' }} />
+            </Box>
+          </Box>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5, mt: 3 }}>
+            <Button variant="outlined" onClick={() => setEditingExpenseRecord(null)}>Cancel</Button>
+            <Button variant="contained" onClick={handleExpenseUpdate} sx={{ bgcolor: '#ea580c' }}>Update Expense</Button>
+          </Box>
+        </DialogContent>
+      </Dialog>
     </GlassDialog>
   );
 };

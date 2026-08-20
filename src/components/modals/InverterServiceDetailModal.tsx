@@ -6,6 +6,7 @@ import {
   FiX, 
   FiEdit, 
   FiPrinter, 
+  FiTrash2,
   FiCalendar,
   FiUser,
   FiServer,
@@ -29,6 +30,7 @@ interface InverterServiceDetailModalProps {
   onClose: () => void;
   service: InverterService | null;
   onEdit: (service: InverterService) => void;
+  onDelete: (service: InverterService) => void;
   getStatusColor: (status: string) => string;
   getPaymentStatusColor: (status: string) => string;
   getWarrantyColor: (status: string) => string;
@@ -39,6 +41,7 @@ const InverterServiceDetailModal: React.FC<InverterServiceDetailModalProps> = ({
   onClose,
   service: rawService,
   onEdit,
+  onDelete,
   getStatusColor,
   getPaymentStatusColor,
   getWarrantyColor
@@ -1188,6 +1191,29 @@ const InverterServiceDetailModal: React.FC<InverterServiceDetailModalProps> = ({
                   }}
                 >
                   <FiX size={isMobile ? 18 : 16} /> Close
+                </motion.button>
+                <motion.button 
+                  onClick={() => onDelete(service)}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  style={{
+                    padding: isMobile ? '14px 20px' : '12px 24px',
+                    borderRadius: '8px',
+                    border: '1px solid #fecaca',
+                    backgroundColor: '#fef2f2',
+                    color: '#dc2626',
+                    cursor: 'pointer',
+                    fontSize: isMobile ? '16px' : '14px',
+                    fontWeight: '600',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    width: isMobile ? '100%' : 'auto',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <FiTrash2 size={isMobile ? 18 : 16} /> Delete Service
                 </motion.button>
                 <motion.button 
                   onClick={() => onEdit(service)}

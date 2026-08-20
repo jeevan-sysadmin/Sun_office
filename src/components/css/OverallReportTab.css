@@ -124,6 +124,11 @@
   border-top: 1px dashed #9ca3af;
 }
 
+.ledger-row.highlight {
+  color: #b91c1c;
+  font-weight: 700;
+}
+
 .kpi-strip {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

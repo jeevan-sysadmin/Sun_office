@@ -983,6 +983,7 @@ const ClientsTab: React.FC<ClientsTabProps> = ({
           onClose={handleCloseDetailModal}
           customer={selectedCustomer}
           onEdit={() => handleEditFromDetail(selectedCustomer)}
+          onDelete={() => onDeleteCustomer(selectedCustomer.id)}
         />
       )}
 

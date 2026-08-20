@@ -108,6 +108,9 @@ interface SalaryData {
   deductions: string;
   payment_method: string;
   transaction_id: string;
+  funding_source: 'business_income' | 'raj_communication' | 'owner_cash' | 'other_borrowing';
+  funding_amount: string;
+  funding_notes: string;
   notes: string;
 }
 
@@ -494,13 +497,16 @@ const StaffFormModal: React.FC<StaffFormModalProps> = ({
   const [salaryForm, setSalaryForm] = useState<SalaryData>({
     staff_id: data?.id || 0,
     staff_name: data?.name || '',
-    service_type: 'both',
+    service_type: 'water',
     salary_month: getCurrentMonth(), // This will always be current month
     amount: '',
     bonus: '0',
     deductions: '0',
     payment_method: 'bank_transfer',
     transaction_id: '',
+    funding_source: 'raj_communication',
+    funding_amount: '0',
+    funding_notes: '',
     notes: ''
   });
 
@@ -508,7 +514,7 @@ const StaffFormModal: React.FC<StaffFormModalProps> = ({
   const [expenseForm, setExpenseForm] = useState<ExpenseData>({
     staff_id: data?.id || 0,
     staff_name: data?.name || '',
-    service_type: 'both',
+    service_type: 'water',
     expense_type: 'petrol',
     amount: '',
     description: '',
@@ -535,13 +541,16 @@ const StaffFormModal: React.FC<StaffFormModalProps> = ({
         setSalaryForm({
           staff_id: data?.id || 0,
           staff_name: data?.name || '',
-          service_type: 'both',
+          service_type: 'water',
           salary_month: currentMonth, // Force current month
           amount: '',
           bonus: '0',
           deductions: '0',
           payment_method: 'bank_transfer',
           transaction_id: `TXN${Date.now()}`,
+          funding_source: 'raj_communication',
+          funding_amount: '0',
+          funding_notes: '',
           notes: ''
         });
         
@@ -552,7 +561,7 @@ const StaffFormModal: React.FC<StaffFormModalProps> = ({
         setExpenseForm({
           staff_id: data?.id || 0,
           staff_name: data?.name || '',
-          service_type: 'both',
+          service_type: 'water',
           expense_type: 'petrol',
           amount: '',
           description: '',
@@ -691,6 +700,17 @@ const StaffFormModal: React.FC<StaffFormModalProps> = ({
     if (salaryForm.deductions && parseFloat(salaryForm.deductions) < 0) {
       newErrors.deductions = 'Deductions cannot be negative';
     }
+
+    const netAmount = parseFloat(calculateNetSalary()) || 0;
+    const fundingAmount = parseFloat(salaryForm.funding_amount || '0') || 0;
+
+    if (salaryForm.funding_source !== 'business_income') {
+      if (fundingAmount <= 0) {
+        newErrors.funding_amount = 'Enter borrowed amount used for this salary';
+      } else if (fundingAmount > netAmount) {
+        newErrors.funding_amount = 'Borrowed amount cannot be more than net salary';
+      }
+    }
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -812,6 +832,9 @@ const StaffFormModal: React.FC<StaffFormModalProps> = ({
         bonus: bonus,
         deductions: deductions,
         net_amount: netAmount,
+        funding_source: salaryForm.funding_source,
+        funding_amount: salaryForm.funding_source === 'business_income' ? 0 : parseFloat(salaryForm.funding_amount || '0'),
+        funding_notes: salaryForm.funding_notes,
         notes: salaryForm.notes,
         paid_by: 1 // Current user ID
       };
@@ -955,6 +978,16 @@ const StaffFormModal: React.FC<StaffFormModalProps> = ({
 
   const handleSalaryPaymentMethodChange = (event: SelectChangeEvent<unknown>) => {
     setSalaryForm({...salaryForm, payment_method: event.target.value as string});
+  };
+
+  const handleSalaryFundingSourceChange = (event: SelectChangeEvent<unknown>) => {
+    const nextSource = event.target.value as SalaryData['funding_source'];
+    setSalaryForm({
+      ...salaryForm,
+      funding_source: nextSource,
+      funding_amount: nextSource === 'business_income' ? '0' : salaryForm.funding_amount,
+      funding_notes: nextSource === 'business_income' ? '' : salaryForm.funding_notes
+    });
   };
 
   const handleExpenseTypeChange = (event: SelectChangeEvent<unknown>) => {
@@ -1696,6 +1729,77 @@ const StaffFormModal: React.FC<StaffFormModalProps> = ({
                         <AttachMoneyIcon sx={{ fontSize: isMobile ? 30 : 40 }} />
                       </Avatar>
                     </NetAmountCard>
+                  </Zoom>
+
+                  {/* Salary Funding */}
+                  <Zoom in={true} style={{ transitionDelay: '275ms' }}>
+                    <FormSection>
+                      <SectionTitle color="#10B981">
+                        <BusinessIcon sx={{ fontSize: isMobile ? 20 : 24 }} /> Salary Funding
+                      </SectionTitle>
+                      <Grid container spacing={isMobile ? 1.5 : 2}>
+                        <Grid size={{ xs: 12, sm: 6 }}>
+                          <FormControl fullWidth>
+                            <InputLabel>Amount Source</InputLabel>
+                            <StyledSelect
+                              value={salaryForm.funding_source}
+                              onChange={handleSalaryFundingSourceChange}
+                              label="Amount Source"
+                            >
+                              <MenuItem value="raj_communication">Raj Electricals</MenuItem>
+                              <MenuItem value="business_income">Sun Office</MenuItem>
+                              <MenuItem value="owner_cash">Owner Cash</MenuItem>
+                              <MenuItem value="other_borrowing">Other Borrowing</MenuItem>
+                            </StyledSelect>
+                          </FormControl>
+                        </Grid>
+
+                        <Grid size={{ xs: 12, sm: 6 }}>
+                          <StyledTextField
+                            fullWidth
+                            label="Borrowed / Support Amount"
+                            type="number"
+                            value={salaryForm.funding_amount}
+                            onChange={(e) => setSalaryForm({...salaryForm, funding_amount: e.target.value})}
+                            onBlur={() => handleBlur('funding_amount')}
+                            error={touched.funding_amount && !!errors.funding_amount}
+                            helperText={
+                              touched.funding_amount && errors.funding_amount
+                                ? errors.funding_amount
+                                : salaryForm.funding_source === 'business_income'
+                                  ? 'Using Sun Office amount only'
+                                  : 'Enter how much came from the selected source'
+                            }
+                            disabled={salaryForm.funding_source === 'business_income'}
+                            InputProps={{
+                              startAdornment: (
+                                <InputAdornment position="start">
+                                  <AttachMoneyIcon sx={{ color: '#10B981', fontSize: isMobile ? 18 : 20 }} />
+                                </InputAdornment>
+                              )
+                            }}
+                          />
+                        </Grid>
+
+                        <Grid size={{ xs: 12 }}>
+                          <StyledTextField
+                            fullWidth
+                            label="Funding Notes"
+                            value={salaryForm.funding_notes}
+                            onChange={(e) => setSalaryForm({...salaryForm, funding_notes: e.target.value})}
+                            placeholder="Example: Took Rs.5000 from Raj Electricals to complete this month's salary"
+                            disabled={salaryForm.funding_source === 'business_income'}
+                            InputProps={{
+                              startAdornment: (
+                                <InputAdornment position="start">
+                                  <BusinessIcon sx={{ color: '#10B981', fontSize: isMobile ? 18 : 20 }} />
+                                </InputAdornment>
+                              )
+                            }}
+                          />
+                        </Grid>
+                      </Grid>
+                    </FormSection>
                   </Zoom>
 
                   {/* Payment Method & Notes */}

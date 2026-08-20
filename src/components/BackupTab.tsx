@@ -14,6 +14,7 @@ interface BackupTabProps {
 }
 
 const LOCAL_BACKUP_KEY = "sun_office_backup_history";
+const DEFAULT_BACKUP_FILE_NAME = "sun_office.sql";
 
 const BackupTab: React.FC<BackupTabProps> = ({ apiBaseUrl, showSnackbar }) => {
   const [loading, setLoading] = useState(false);
@@ -43,7 +44,7 @@ const BackupTab: React.FC<BackupTabProps> = ({ apiBaseUrl, showSnackbar }) => {
       const key = item.id || `${item.file_name}-${item.created_at}`;
       mergedMap.set(key, {
         id: key,
-        file_name: item.file_name || "sun_office.sql",
+        file_name: item.file_name || DEFAULT_BACKUP_FILE_NAME,
         created_at: item.created_at || new Date().toISOString(),
         size: item.size,
       });
@@ -119,7 +120,7 @@ const BackupTab: React.FC<BackupTabProps> = ({ apiBaseUrl, showSnackbar }) => {
 
       // Automatic download without navigating the current tab.
       const createdAt = new Date().toISOString();
-      const fileName = "sun_office.sql";
+      const fileName = DEFAULT_BACKUP_FILE_NAME;
       const downloadUrl = `${activeBase}/backup.php?action=take_download&file=${encodeURIComponent(fileName)}`;
 
       const iframe = document.createElement("iframe");
@@ -258,14 +259,14 @@ const BackupTab: React.FC<BackupTabProps> = ({ apiBaseUrl, showSnackbar }) => {
                 {backupHistory.map((item, index) => (
                   <tr key={item.id}>
                     <td style={{ borderBottom: "1px solid #f3f4f6", padding: "8px" }}>{index + 1}</td>
-                    <td style={{ borderBottom: "1px solid #f3f4f6", padding: "8px" }}>{item.file_name || "sun_office.sql"}</td>
+                    <td style={{ borderBottom: "1px solid #f3f4f6", padding: "8px" }}>{item.file_name || DEFAULT_BACKUP_FILE_NAME}</td>
                     <td style={{ borderBottom: "1px solid #f3f4f6", padding: "8px" }}>{formatSize(item.size)}</td>
                     <td style={{ borderBottom: "1px solid #f3f4f6", padding: "8px" }}>
                       {new Date(item.created_at).toLocaleString()}
                     </td>
                     <td style={{ borderBottom: "1px solid #f3f4f6", padding: "8px" }}>
                       <button
-                        onClick={() => downloadHistoryFile(item.file_name || "sun_office.sql")}
+                        onClick={() => downloadHistoryFile(item.file_name || DEFAULT_BACKUP_FILE_NAME)}
                         style={{
                           border: "1px solid #d1d5db",
                           background: "#fff",

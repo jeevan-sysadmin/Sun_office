@@ -5,6 +5,13 @@ import type { User as DashboardUser } from "./components/types";
 const Login = lazy(() => import("./components/Login"));
 const Dashboard = lazy(() => import("./components/Dashboard"));
 
+const routerBaseName = (import.meta.env.BASE_URL || "/").replace(/\/+$/, "") || "/";
+
+const buildAppPath = (path: string) => {
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return routerBaseName === "/" ? normalizedPath : `${routerBaseName}${normalizedPath}`;
+};
+
 
 // Type for user data from database (matches Login component's User type)
 interface LoginUser {
@@ -392,7 +399,7 @@ function App() {
       console.error('Logout failed:', error);
       // Force clear localStorage as fallback
       localStorage.clear();
-      window.location.href = '/login';
+      window.location.href = buildAppPath('/login');
     }
   };
 
@@ -432,7 +439,7 @@ function App() {
 
   return (
     <ErrorBoundary>
-      <Router>
+      <Router basename={routerBaseName}>
         <Suspense
           fallback={
             <div style={{
@@ -485,7 +492,7 @@ function App() {
               <button
                 onClick={() => {
                   localStorage.clear();
-                  window.location.href = '/login';
+                  window.location.href = buildAppPath('/login');
                 }}
                 style={{
                   padding: '5px 10px',
@@ -578,7 +585,7 @@ function App() {
                       Page not found
                     </p>
                     <a 
-                      href="/dashboard" 
+                      href={buildAppPath('/dashboard')} 
                       style={{
                         padding: '12px 24px',
                         backgroundColor: '#3b82f6',

@@ -80,6 +80,12 @@ interface UiNotification {
   read: boolean;
 }
 
+interface CardTabDrilldownFilter {
+  staffName: string;
+  serviceDate: string;
+  requestKey: number;
+}
+
 // Sidebar Component with Pending Calls
 interface SidebarProps {
   user: User;
@@ -496,6 +502,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
   const [staff, setStaff] = useState<Staff[]>([]);
   const [recentServices, setRecentServices] = useState<ServiceOrder[]>([]);
   const [pendingCallsCount, setPendingCallsCount] = useState<number>(0);
+  const [cardTabDrilldownFilter, setCardTabDrilldownFilter] = useState<CardTabDrilldownFilter | null>(null);
   
   // Revenue Stats
   const [revenueStats, setRevenueStats] = useState<RevenueStats>({
@@ -1675,8 +1682,22 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
     setFilterStaffStatus("all");
     setFilterStaffDepartment("all");
     setFilterStaffRole("all");
+    setCardTabDrilldownFilter(null);
     
     // Stop scanning when changing tabs
+    stopScanning();
+  };
+
+  const handleOpenCompletedCallsFromReport = ({ staffName, serviceDate }: { staffName: string; serviceDate: string }) => {
+    setCardTabDrilldownFilter({
+      staffName,
+      serviceDate,
+      requestKey: Date.now(),
+    });
+    setActiveTab('cards');
+    if (isMobile || isTablet) {
+      setSidebarOpen(false);
+    }
     stopScanning();
   };
   
@@ -2001,6 +2022,11 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
       const inverterIds = toValidIds((serviceForm as any).inverter_ids);
       const primaryBatteryId = batteryIds[0] || (serviceForm.battery_id ? Number(serviceForm.battery_id) : null);
       const primaryInverterId = inverterIds[0] || (serviceForm.inverter_id ? Number(serviceForm.inverter_id) : null);
+      const normalizedServiceType = serviceForm.service_type || "battery_service";
+      const normalizedIssueDescription = (serviceForm.issue_description || "").trim()
+        || (normalizedServiceType === "battery_service"
+          ? "Routine water service visit"
+          : "Routine inverter service visit");
 
       const serviceData: any = {
         customer_id: serviceForm.customer_id || "",
@@ -2010,7 +2036,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
         battery_id: primaryBatteryId || "",
         inverter_id: primaryInverterId || "",
         service_staff_id: serviceForm.service_staff_id || "",
-        issue_description: serviceForm.issue_description || "",
+        issue_description: normalizedIssueDescription,
         warranty_status: serviceForm.warranty_status || "out_of_warranty",
         amc_status: serviceForm.amc_status || "no_amc",
         notes: serviceForm.notes || "",
@@ -2021,7 +2047,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
         final_cost: serviceForm.final_cost || "0",
         deposit_amount: serviceForm.deposit_amount || "0",
         estimated_completion_date: serviceForm.estimated_completion_date || "",
-        battery_claim: serviceForm.battery_claim || "none"
+        battery_claim: serviceForm.battery_claim || "none",
+        service_type: normalizedServiceType
       };
       
       // Add replacement battery serial if present
@@ -3370,6 +3397,28 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
                     handleStaffDetailClose();
                     handleEditStaff(selectedStaff);
                   }}
+                  onAddSalary={() => {
+                    const currentStaff = selectedStaff;
+                    handleStaffDetailClose();
+                    if (currentStaff) {
+                      handleAddSalary(currentStaff);
+                    }
+                  }}
+                  onAddExpense={() => {
+                    const currentStaff = selectedStaff;
+                    handleStaffDetailClose();
+                    if (currentStaff) {
+                      handleAddExpense(currentStaff);
+                    }
+                  }}
+                  onDelete={() => {
+                    const currentStaff = selectedStaff;
+                    handleStaffDetailClose();
+                    if (currentStaff) {
+                      handleDeleteStaff(currentStaff.id);
+                    }
+                  }}
+                  onRefresh={loadStaff}
                 />
               )}
             </AnimatePresence>
@@ -3436,6 +3485,11 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
                 onEdit={() => {
                   handleEditService(selectedService);
                 }}
+                onDelete={() => {
+                  const serviceId = selectedService.id;
+                  setSelectedService(null);
+                  handleDeleteService(serviceId);
+                }}
                 getStatusColor={getStatusColor}
                 getPriorityColor={getPriorityColor}
                 getPaymentStatusColor={getPaymentStatusColor}
@@ -3456,6 +3510,10 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
                   setSelectedInverterService(null);
                   handleEditInverterService(service);
                 }}
+                onDelete={(service) => {
+                  setSelectedInverterService(null);
+                  handleDeleteInverterService(service.id);
+                }}
                 getStatusColor={getStatusColor}
                 getPaymentStatusColor={getPaymentStatusColor}
                 getWarrantyColor={getWarrantyColor}
@@ -3473,6 +3531,11 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
                 onEdit={() => {
                   handleCustomerDetailClose();
                   handleEditCustomer(selectedCustomer);
+                }}
+                onDelete={() => {
+                  const customerId = selectedCustomer.id;
+                  handleCustomerDetailClose();
+                  handleDeleteCustomer(customerId);
                 }}
               />
             )}
@@ -3518,6 +3581,17 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
                   } else if (selectedInverter) {
                     handleEditInverter(selectedInverter);
                   }
+                }}
+                onDelete={() => {
+                  if (selectedBattery) {
+                    setDeleteItem({ type: 'battery', id: selectedBattery.id });
+                  } else if (selectedInverter) {
+                    setDeleteItem({ type: 'inverter', id: selectedInverter.id });
+                  }
+                  setShowProductDetail(false);
+                  setSelectedBattery(null);
+                  setSelectedInverter(null);
+                  setShowDeleteConfirm(true);
                 }}
                 getBatteryTypeColor={getBatteryTypeColor}
                 getConditionColor={getConditionColor}
@@ -3616,6 +3690,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
               loading={loading}
               error={error}
               onRefresh={handleRefresh}
+              drilldownFilter={cardTabDrilldownFilter}
               filterStatus={filterStatus}
               filterPriority={filterPriority}
               filterClaimType={filterClaimType}
@@ -3647,6 +3722,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user: propUser }) => {
               dashboardStats={dashboardStats}
               selectedMonth={selectedFinancialMonth}
               onMonthChange={setSelectedFinancialMonth}
+              onOpenCompletedCalls={handleOpenCompletedCallsFromReport}
               loading={loading}
             />
           )}
